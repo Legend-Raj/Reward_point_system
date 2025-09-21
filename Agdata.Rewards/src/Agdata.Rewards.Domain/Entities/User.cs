@@ -4,31 +4,31 @@ using Agdata.Rewards.Domain.ValueObjects;
 namespace Agdata.Rewards.Domain.Entities;
 
 /// <summary>
-/// User = AGDATA employee with a points balance.
-/// Domain invariants:
-/// - PointsBalance >= 0
-/// - Credit/Debit amounts must be > 0
-/// - Inactive users shouldn't be allocated points (service-level guard),
-///   but entity still protects its own numeric invariants.
+/// Ye User class hai jo AGDATA ke employee ko represent karta hai with points balance.
+/// Basic rules hai ye:
+/// - Points balance kabhi negative nahi ho sakta
+/// - Credit/Debit amounts hamesha positive hona chahiye
+/// - Inactive users ko points nahi milne chahiye (service level pe check karna hai),
+///   lekin yahan bhi safety ke liye numeric checks hai
 /// </summary>
 public class User
 {
-    // ----- Identity (immutable) -----
+    // Ye basic identity info hai jo change nahi hota
     public Guid Id { get; }
     public Email Email { get; }
     public EmployeeId EmployeeId { get; }
 
-    // ----- Profile / State -----
+    // Profile aur current state info
     public string Name { get; private set; }
     public bool IsActive { get; private set; }
 
     /// <summary>
-    /// Current points snapshot for fast reads.
-    /// True source-of-truth for history is the PointsTransaction ledger.
+    /// Abhi kitne points hai user ke paas - ye quick reading ke liye hai.
+    /// Real history to PointsTransaction table mein milegi.
     /// </summary>
     public int PointsBalance { get; private set; }
 
-    // ----- Constructors (use the main ctor or factory) -----
+    // Main constructor - ye use karo new user banane ke liye
     public User(Guid id, string name, Email email, EmployeeId employeeId, bool isActive = true, int pointsBalance = 0)
     {
         if (id == Guid.Empty) throw new DomainException("User Id cannot be empty.");
@@ -44,23 +44,24 @@ public class User
     }
 
     /// <summary>
-    /// Factory helper for convenience.
+    /// Easy factory method - naya user banane ke liye use karo ye
     /// </summary>
     public static User CreateNew(string name, string email, string employeeId)
         => new(Guid.NewGuid(), name, new Email(email), new EmployeeId(employeeId));
 
-    // ----- Behavior / Rules -----
+    // Business logic aur rules yahan hai
 
-    /// <summary> Activate the employee account. </summary>
+    /// <summary> Employee ko activate karne ke liye </summary>
     public void Activate() => IsActive = true;
 
-    /// <summary> Deactivate the employee account. </summary>
+    /// <summary> Employee ko deactivate karne ke liye </summary>
     public void Deactivate() => IsActive = false;
 
     /// <summary>
-    /// Add points to user. Amount must be positive.
-    /// (Service is responsible to ensure only authorized flows call this
-    /// and also append a matching PointsTransaction ledger entry.)
+    /// User ke account mein points add karna hai to ye use karo.
+    /// Points positive number hona chahiye.
+    /// (Service layer ki responsibility hai ki sirf authorized calls hi aayein
+    /// aur PointsTransaction table mein entry bhi kare)
     /// </summary>
     public void Credit(int points)
     {
@@ -73,7 +74,7 @@ public class User
     }
 
     /// <summary>
-    /// Deduct points from user. Amount must be positive and not exceed balance.
+    /// Points kam karne ke liye ye use karo. Amount positive hona chahiye aur balance se zyada nahi.
     /// </summary>
     public void Debit(int points)
     {
@@ -85,7 +86,7 @@ public class User
     }
 
     /// <summary>
-    /// Optional: rename user (kept small and safe).
+    /// Agar user ka naam change karna hai to ye method use karo
     /// </summary>
     public void Rename(string newName)
     {
