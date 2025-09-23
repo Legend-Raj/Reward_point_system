@@ -24,7 +24,7 @@ public sealed class Event
         IsActive = isActive;
     }
 
-    public static Event CreateNewEvent(string name, DateTimeOffset occurredAt)
+    public static Event CreateNew(string name, DateTimeOffset occurredAt)
     {
         return new Event(Guid.NewGuid(), name, occurredAt);
     }

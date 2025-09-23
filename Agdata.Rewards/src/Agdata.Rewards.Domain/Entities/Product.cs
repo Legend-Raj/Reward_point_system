@@ -28,7 +28,7 @@ public sealed class Product
         IsActive = isActive;
     }
 
-    public static Product CreateNewProduct(string name, int requiredPoints, int? stock = null)
+    public static Product CreateNew(string name, int requiredPoints, int? stock = null)
     {
         return new Product(Guid.NewGuid(), name, requiredPoints, stock);
     }
@@ -82,36 +82,33 @@ public sealed class Product
         return Stock is null || Stock.Value >= quantity;
     }
 
-    public void ReduceStock(int quantity = 1)
+    public void DecrementStock(int quantity = 1)
     {
         if (quantity <= 0) 
         {
             throw new DomainException("Quantity must be positive.");
         }
-        
         if (Stock is null) 
         {
-            return;
+            return; // Untracked, do nothing
         }
-
         if (Stock.Value < quantity)
+        {
             throw new DomainException("Insufficient stock.");
-
+        }
         Stock -= quantity;
     }
 
-    public void RestoreStock(int quantity = 1)
+    public void IncrementStock(int quantity = 1)
     {
         if (quantity <= 0) 
         {
             throw new DomainException("Quantity must be positive.");
         }
-        
         if (Stock is null) 
         {
-            return;
+            return; // Untracked, do nothing
         }
-
         checked 
         { 
             Stock += quantity; 
@@ -129,13 +126,17 @@ public sealed class Product
     private static void ValidatePointsRequired(int requiredPoints)
     {
         if (requiredPoints <= 0)
+        {
             throw new DomainException("Required points must be a positive number.");
+        }
     }
 
     private static void ValidateStockAmount(int? stock)
     {
         if (stock is < 0)
+        {
             throw new DomainException("Stock cannot be negative.");
+        }
     }
 
     public override string ToString()

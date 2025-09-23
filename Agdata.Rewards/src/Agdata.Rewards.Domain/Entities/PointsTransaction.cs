@@ -36,9 +36,13 @@ public sealed class PointsTransaction
         }
 
         if (type == TransactionType.Earn && eventId is null)
+        {
             throw new DomainException("'Earn' transaction must be linked to an event.");
+        }
         if (type == TransactionType.Redeem && redemptionId is null)
+        {
             throw new DomainException("'Redeem' transaction must be linked to a redemption.");
+        }
 
         Id = id;
         UserId = userId;
