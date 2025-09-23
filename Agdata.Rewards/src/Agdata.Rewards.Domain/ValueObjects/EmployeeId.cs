@@ -9,7 +9,9 @@ public sealed record EmployeeId
     public EmployeeId(string value)
     {
         if (string.IsNullOrWhiteSpace(value))
+        {
             throw new DomainException("EmployeeId cannot be empty.");
+        }
         Value = value.Trim();
     }
 

@@ -13,7 +13,9 @@ public sealed record Email
     public Email(string value)
     {
         if (string.IsNullOrWhiteSpace(value) || !Pattern.IsMatch(value))
+        {
             throw new DomainException("Invalid email address.");
+        }
         Value = value.Trim();
     }
 
