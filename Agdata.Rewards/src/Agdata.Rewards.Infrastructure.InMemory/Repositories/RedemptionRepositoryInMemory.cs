@@ -16,20 +16,20 @@ public class RedemptionRepositoryInMemory : IRedemptionRepository
 
     public Task<bool> HasPendingRedemptionForProductAsync(Guid userId, Guid productId)
     {
-        var hasPending = _redemptions.Values.Any(r => 
-            r.UserId == userId && 
-            r.ProductId == productId && 
+        var hasPending = _redemptions.Values.Any(r =>
+            r.UserId == userId &&
+            r.ProductId == productId &&
             r.Status == RedemptionStatus.Pending);
-            
+
         return Task.FromResult(hasPending);
     }
-    
+
     public Task<bool> AnyPendingRedemptionsForProductAsync(Guid productId)
     {
-        var anyPending = _redemptions.Values.Any(r => 
-            r.ProductId == productId && 
+        var anyPending = _redemptions.Values.Any(r =>
+            r.ProductId == productId &&
             r.Status == RedemptionStatus.Pending);
-            
+
         return Task.FromResult(anyPending);
     }
 

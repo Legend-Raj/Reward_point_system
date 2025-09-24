@@ -12,7 +12,7 @@ public class ProductRepositoryInMemory : IProductRepository
         _products.TryGetValue(id, out var product);
         return Task.FromResult(product);
     }
-    
+
     public Task<IEnumerable<Product>> GetAllAsync()
     {
         return Task.FromResult(_products.Values.AsEnumerable());

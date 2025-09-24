@@ -20,15 +20,15 @@ public class UserService : IUserService
 
     public async Task<User> CreateNewUserAsync(string name, string email, string employeeId)
     {
-        var emailValueObject = new Email(email);
-        var employeeIdValueObject = new EmployeeId(employeeId);
+        var emailAddress = new Email(email);
+        var employeeIdentifier = new EmployeeId(employeeId);
 
-        if (await _userRepository.GetByEmailAsync(emailValueObject) is not null)
+        if (await _userRepository.GetByEmailAsync(emailAddress) is not null)
         {
             throw new DomainException("A user with this email already exists.");
         }
 
-        if (await _userRepository.GetByEmployeeIdAsync(employeeIdValueObject) is not null)
+        if (await _userRepository.GetByEmployeeIdAsync(employeeIdentifier) is not null)
         {
             throw new DomainException("A user with this employee ID already exists.");
         }

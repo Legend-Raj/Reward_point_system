@@ -12,11 +12,11 @@ public sealed class Product
 
     public Product(Guid id, string name, int requiredPoints, int? stock = null, bool isActive = true)
     {
-        if (id == Guid.Empty) 
+        if (id == Guid.Empty)
         {
             throw new DomainException("Product Id cannot be empty.");
         }
-        
+
         ValidateProductName(name);
         ValidatePointsRequired(requiredPoints);
         ValidateStockAmount(stock);
@@ -33,12 +33,12 @@ public sealed class Product
         return new Product(Guid.NewGuid(), name, requiredPoints, stock);
     }
 
-    public void MakeInactive() 
+    public void MakeInactive()
     {
         IsActive = false;
     }
 
-    public void MakeActive() 
+    public void MakeActive()
     {
         IsActive = true;
     }
@@ -74,21 +74,21 @@ public sealed class Product
 
     public bool IsAvailableInStock(int quantity = 1)
     {
-        if (quantity <= 0) 
+        if (quantity <= 0)
         {
             throw new DomainException("Quantity must be positive.");
         }
-        
+
         return Stock is null || Stock.Value >= quantity;
     }
 
     public void DecrementStock(int quantity = 1)
     {
-        if (quantity <= 0) 
+        if (quantity <= 0)
         {
             throw new DomainException("Quantity must be positive.");
         }
-        if (Stock is null) 
+        if (Stock is null)
         {
             return; // Untracked, do nothing
         }
@@ -101,17 +101,17 @@ public sealed class Product
 
     public void IncrementStock(int quantity = 1)
     {
-        if (quantity <= 0) 
+        if (quantity <= 0)
         {
             throw new DomainException("Quantity must be positive.");
         }
-        if (Stock is null) 
+        if (Stock is null)
         {
             return; // Untracked, do nothing
         }
-        checked 
-        { 
-            Stock += quantity; 
+        checked
+        {
+            Stock += quantity;
         }
     }
 

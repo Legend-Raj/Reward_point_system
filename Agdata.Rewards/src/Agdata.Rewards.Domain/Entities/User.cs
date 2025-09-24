@@ -17,11 +17,11 @@ public class User
 
     public User(Guid id, string name, Email email, EmployeeId employeeId, bool isActive = true, int totalPoints = 0, int lockedPoints = 0)
     {
-        if (id == Guid.Empty) 
+        if (id == Guid.Empty)
         {
             throw new DomainException("User Id cannot be empty.");
         }
-        if (string.IsNullOrWhiteSpace(name)) 
+        if (string.IsNullOrWhiteSpace(name))
         {
             throw new DomainException("Name is required.");
         }
@@ -44,12 +44,12 @@ public class User
         return new User(Guid.NewGuid(), name, new Email(email), new EmployeeId(employeeId));
     }
 
-    public void ActivateAccount() 
+    public void ActivateAccount()
     {
         IsActive = true;
     }
 
-    public void DeactivateAccount() 
+    public void DeactivateAccount()
     {
         IsActive = false;
     }
@@ -60,34 +60,34 @@ public class User
         {
             throw new DomainException("Credit points must be a positive number.");
         }
-        
+
         checked
         {
             TotalPoints += points;
         }
     }
-    
+
     public void LockPoints(int pointsToLock)
     {
-        if (pointsToLock <= 0) 
+        if (pointsToLock <= 0)
         {
             throw new DomainException("Points to lock must be positive.");
         }
-        if (AvailablePoints < pointsToLock) 
+        if (AvailablePoints < pointsToLock)
         {
             throw new DomainException("Insufficient available points to lock.");
         }
-        
+
         LockedPoints += pointsToLock;
     }
 
     public void UnlockPoints(int pointsToUnlock)
     {
-        if (pointsToUnlock <= 0) 
+        if (pointsToUnlock <= 0)
         {
             throw new DomainException("Points to unlock must be positive.");
         }
-        if (LockedPoints < pointsToUnlock) 
+        if (LockedPoints < pointsToUnlock)
         {
             throw new DomainException("Cannot unlock more points than are locked.");
         }
@@ -97,11 +97,11 @@ public class User
 
     public void CommitLockedPoints(int pointsToCommit)
     {
-        if (pointsToCommit <= 0) 
+        if (pointsToCommit <= 0)
         {
             throw new DomainException("Points to commit must be positive.");
         }
-        if (LockedPoints < pointsToCommit) 
+        if (LockedPoints < pointsToCommit)
         {
             throw new DomainException("Cannot commit more points than are locked.");
         }
@@ -116,11 +116,11 @@ public class User
         {
             throw new DomainException("Name cannot be empty.");
         }
-        
+
         Name = newName.Trim();
     }
-    
-    public override string ToString() 
+
+    public override string ToString()
     {
         return $"{Name} ({Email}) [{EmployeeId}] - Total: {TotalPoints}, Available: {AvailablePoints}, Active: {IsActive}";
     }

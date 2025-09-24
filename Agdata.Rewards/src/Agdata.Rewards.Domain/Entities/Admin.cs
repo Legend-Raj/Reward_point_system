@@ -9,7 +9,7 @@ public sealed class Admin : User
     {
         // Admin inherits all base properties and behavior from User
     }
-    
+
     public new static Admin CreateNew(string name, string email, string employeeId)
     {
         return new Admin(Guid.NewGuid(), name, new Email(email), new EmployeeId(employeeId));

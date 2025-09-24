@@ -34,9 +34,9 @@ public class ProductCatalogService : IProductCatalogService
     {
         var product = await _productRepository.GetByIdAsync(productId)
             ?? throw new DomainException("Product not found.");
-            
+
         product.UpdateProductDetails(name, requiredPoints, stock);
-        
+
         _productRepository.Update(product);
         await _unitOfWork.SaveChangesAsync();
     }
@@ -47,11 +47,11 @@ public class ProductCatalogService : IProductCatalogService
             ?? throw new DomainException("Product not found.");
 
         product.MakeInactive();
-        
+
         _productRepository.Update(product);
         await _unitOfWork.SaveChangesAsync();
     }
-    
+
     public async Task ActivateProductAsync(Admin editor, Guid productId)
     {
         var product = await _productRepository.GetByIdAsync(productId)
@@ -69,7 +69,7 @@ public class ProductCatalogService : IProductCatalogService
         {
             throw new DomainException("Product cannot be deleted as it has pending redemptions.");
         }
-        
+
         _productRepository.Delete(productId);
         await _unitOfWork.SaveChangesAsync();
     }

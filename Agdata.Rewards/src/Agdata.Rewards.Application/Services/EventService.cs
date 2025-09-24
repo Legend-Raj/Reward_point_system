@@ -29,10 +29,10 @@ public class EventService : IEventService
     {
         var eventToUpdate = await _eventRepository.GetByIdAsync(eventId)
             ?? throw new DomainException("Event not found.");
-            
+
         eventToUpdate.UpdateEventName(name);
         eventToUpdate.ChangeEventDateTime(occurredAt);
-        
+
         _eventRepository.Update(eventToUpdate);
         await _unitOfWork.SaveChangesAsync();
     }
@@ -41,9 +41,9 @@ public class EventService : IEventService
     {
         var eventToUpdate = await _eventRepository.GetByIdAsync(eventId)
             ?? throw new DomainException("Event not found.");
-            
+
         eventToUpdate.MakeInactive();
-        
+
         _eventRepository.Update(eventToUpdate);
         await _unitOfWork.SaveChangesAsync();
     }

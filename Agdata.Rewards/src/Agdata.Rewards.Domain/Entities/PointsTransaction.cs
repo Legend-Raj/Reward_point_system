@@ -22,15 +22,15 @@ public sealed class PointsTransaction
         Guid? eventId = null,
         Guid? redemptionId = null)
     {
-        if (id == Guid.Empty) 
+        if (id == Guid.Empty)
         {
             throw new DomainException("Transaction Id cannot be empty.");
         }
-        if (userId == Guid.Empty) 
+        if (userId == Guid.Empty)
         {
             throw new DomainException("UserId is required for a transaction.");
         }
-        if (points <= 0) 
+        if (points <= 0)
         {
             throw new DomainException("Transaction points must be a positive number.");
         }

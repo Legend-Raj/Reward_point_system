@@ -62,10 +62,9 @@ public class PointsLedgerService : IPointsLedgerService
 
         return pointsTransaction.Id;
     }
-    
+
     public Task<IEnumerable<PointsTransaction>> GetUserTransactionHistoryAsync(Guid userId)
     {
-        // This can be implemented later by adding a GetByUserIdAsync method to the IPointsTransactionRepository
-        throw new NotImplementedException();
+        throw new NotImplementedException("Add IPointsTransactionRepository.GetByUserIdAsync to surface history.");
     }
 }

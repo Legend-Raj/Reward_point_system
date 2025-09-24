@@ -21,15 +21,15 @@ public sealed class Redemption
 
     private Redemption(Guid id, Guid userId, Guid productId)
     {
-        if (id == Guid.Empty) 
+        if (id == Guid.Empty)
         {
             throw new DomainException("Redemption Id cannot be empty.");
         }
-        if (userId == Guid.Empty) 
+        if (userId == Guid.Empty)
         {
             throw new DomainException("UserId is required for a redemption.");
         }
-        if (productId == Guid.Empty) 
+        if (productId == Guid.Empty)
         {
             throw new DomainException("ProductId is required for a redemption.");
         }

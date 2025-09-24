@@ -11,11 +11,11 @@ public sealed class Event
 
     public Event(Guid id, string name, DateTimeOffset occurredAt, bool isActive = true)
     {
-        if (id == Guid.Empty) 
+        if (id == Guid.Empty)
         {
             throw new DomainException("Event Id cannot be empty.");
         }
-        
+
         ValidateEventName(name);
 
         Id = id;
@@ -40,12 +40,12 @@ public sealed class Event
         OccurredAt = newWhen;
     }
 
-    public void MakeActive() 
+    public void MakeActive()
     {
         IsActive = true;
     }
-    
-    public void MakeInactive() 
+
+    public void MakeInactive()
     {
         IsActive = false;
     }

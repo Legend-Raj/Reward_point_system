@@ -13,7 +13,7 @@ public class UserRepositoryInMemory : IUserRepository
         _users.TryGetValue(id, out var user);
         return Task.FromResult(user);
     }
-    
+
     public Task<User?> GetByEmailAsync(Email email)
     {
         var user = _users.Values.FirstOrDefault(u => u.Email.Value == email.Value);

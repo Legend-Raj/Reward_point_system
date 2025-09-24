@@ -31,32 +31,29 @@ public class RedemptionService : IRedemptionService
 
     public async Task<Guid> RequestRedemptionAsync(Guid userId, Guid productId)
     {
-        var user = await _userRepository.GetByIdAsync(userId) 
+        var user = await _userRepository.GetByIdAsync(userId)
             ?? throw new DomainException("User not found.");
 
         var product = await _productRepository.GetByIdAsync(productId)
             ?? throw new DomainException("Product not found.");
 
-        // Verify user account status
         if (!user.IsActive)
         {
             throw new DomainException("Inactive users cannot request redemptions.");
         }
 
-        // Ensure product is available for redemption
         if (!product.IsActive)
         {
             throw new DomainException("Cannot redeem an inactive product.");
         }
-        
-        // Check for duplicate redemption requests
+
         if (await _redemptionRepository.HasPendingRedemptionForProductAsync(userId, productId))
         {
             throw new DomainException("A pending redemption for this product already exists.");
         }
 
         user.LockPoints(product.RequiredPoints);
-        
+
         var redemption = Redemption.CreateNew(user.Id, product.Id);
 
         _redemptionRepository.Add(redemption);
@@ -73,28 +70,24 @@ public class RedemptionService : IRedemptionService
             ?? throw new DomainException("Redemption not found.");
 
         redemption.Approve();
-        
+
         _redemptionRepository.Update(redemption);
         await _unitOfWork.SaveChangesAsync();
     }
 
     public async Task DeliverRedemptionAsync(Admin deliverer, Guid redemptionId)
     {
-        // Get the redemption request
         var redemption = await _redemptionRepository.GetByIdAsync(redemptionId)
             ?? throw new DomainException("Redemption not found.");
-            
-        // Retrieve associated user and product
+
         var userAccount = await _userRepository.GetByIdAsync(redemption.UserId)
             ?? throw new DomainException("User associated with redemption not found.");
 
         var redeemedProduct = await _productRepository.GetByIdAsync(redemption.ProductId)
             ?? throw new DomainException("Product associated with redemption not found.");
 
-        // Process the points commitment
         userAccount.CommitLockedPoints(redeemedProduct.RequiredPoints);
-        
-        // Record the transaction
+
         var pointsTransaction = new PointsTransaction(
             Guid.NewGuid(),
             userAccount.Id,
@@ -104,14 +97,11 @@ public class RedemptionService : IRedemptionService
             redemptionId: redemption.Id
         );
         _pointsTransactionRepository.Add(pointsTransaction);
-        
-        // Update inventory (safe to call even if product doesn't track stock)
+
         redeemedProduct.DecrementStock();
-        
-        // Mark redemption as delivered
+
         redemption.Deliver();
 
-        // Save everything to database
         _userRepository.Update(userAccount);
         _productRepository.Update(redeemedProduct);
         _redemptionRepository.Update(redemption);
@@ -131,18 +121,18 @@ public class RedemptionService : IRedemptionService
 
         user.UnlockPoints(product.RequiredPoints);
         redemption.Reject();
-        
+
         _userRepository.Update(user);
         _redemptionRepository.Update(redemption);
 
         await _unitOfWork.SaveChangesAsync();
     }
-    
+
     public async Task CancelRedemptionAsync(Admin canceller, Guid redemptionId)
     {
         var redemption = await _redemptionRepository.GetByIdAsync(redemptionId)
             ?? throw new DomainException("Redemption not found.");
-            
+
         var user = await _userRepository.GetByIdAsync(redemption.UserId)
             ?? throw new DomainException("User not found.");
 
