@@ -1,0 +1,33 @@
+COMPLETE COPY.txt
+AGDATA_Reward_Points_System.txt
+
+# Build artifacts
+**/bin/
+**/obj/
+**/out/
+
+# IDE and tooling
+.vs/
+.idea/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+_ReSharper.Caches/
+
+# Test results and coverage
+TestResults/
+coverage/
+*.trx
+*.coverage
+*.coveragexml
+
+# NuGet packages
+packages/
+*.nupkg
+*.snupkg
+
+# Logs and misc
+logs/
+*.log

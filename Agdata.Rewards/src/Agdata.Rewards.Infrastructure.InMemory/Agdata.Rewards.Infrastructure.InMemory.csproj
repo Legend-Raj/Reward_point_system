@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Agdata.Rewards.Application\Agdata.Rewards.Application.csproj" />
+    <ProjectReference Include="..\Agdata.Rewards.Domain\Agdata.Rewards.Domain.csproj" />
+  </ItemGroup>
+</Project>

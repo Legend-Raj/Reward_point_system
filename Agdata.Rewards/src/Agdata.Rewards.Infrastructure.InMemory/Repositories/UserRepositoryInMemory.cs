@@ -20,6 +20,12 @@ public class UserRepositoryInMemory : IUserRepository
         return Task.FromResult(user);
     }
 
+    public Task<User?> GetByEmployeeIdAsync(EmployeeId employeeId)
+    {
+        var user = _users.Values.FirstOrDefault(u => u.EmployeeId.Value == employeeId.Value);
+        return Task.FromResult(user);
+    }
+
     public void Add(User user)
     {
         _users[user.Id] = user;
