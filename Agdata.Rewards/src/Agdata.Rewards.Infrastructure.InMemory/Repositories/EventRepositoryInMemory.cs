@@ -1,3 +1,4 @@
+using System.Linq;
 using Agdata.Rewards.Application.Interfaces.Repositories;
 using Agdata.Rewards.Domain.Entities;
 
@@ -11,6 +12,11 @@ public class EventRepositoryInMemory : IEventRepository
     {
         _events.TryGetValue(id, out var foundEvent);
         return Task.FromResult(foundEvent);
+    }
+
+    public Task<IEnumerable<Event>> GetAllAsync()
+    {
+        return Task.FromResult(_events.Values.AsEnumerable());
     }
 
     public void Add(Event newEvent)

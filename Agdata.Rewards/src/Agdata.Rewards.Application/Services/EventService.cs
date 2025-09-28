@@ -1,3 +1,4 @@
+using System.Linq;
 using Agdata.Rewards.Application.Interfaces;
 using Agdata.Rewards.Application.Interfaces.Repositories;
 using Agdata.Rewards.Application.Interfaces.Services;
@@ -46,5 +47,27 @@ public class EventService : IEventService
 
         _eventRepository.Update(eventToUpdate);
         await _unitOfWork.SaveChangesAsync();
+    }
+
+    public async Task<IEnumerable<Event>> GetActiveEventsAsync()
+    {
+        var events = await _eventRepository.GetAllAsync();
+        var now = DateTimeOffset.UtcNow;
+
+        return events
+            .Where(e => e.IsActive && e.OccurredAt >= now)
+            .OrderBy(e => e.OccurredAt)
+            .ToList();
+    }
+
+    public async Task<IEnumerable<Event>> GetPastEventsAsync()
+    {
+        var events = await _eventRepository.GetAllAsync();
+        var now = DateTimeOffset.UtcNow;
+
+        return events
+            .Where(e => e.OccurredAt < now)
+            .OrderByDescending(e => e.OccurredAt)
+            .ToList();
     }
 }
