@@ -14,5 +14,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Agdata.Rewards.Application\Agdata.Rewards.Application.csproj" />
     <ProjectReference Include="..\..\src\Agdata.Rewards.Domain\Agdata.Rewards.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Agdata.Rewards.Infrastructure.InMemory\Agdata.Rewards.Infrastructure.InMemory.csproj" />
   </ItemGroup>
 </Project>
