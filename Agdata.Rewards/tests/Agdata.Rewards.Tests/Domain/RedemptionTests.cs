@@ -14,6 +14,8 @@ public class RedemptionTests
 
         Assert.Equal(RedemptionStatus.Pending, redemption.Status);
         Assert.NotEqual(default, redemption.RequestedAt);
+        Assert.Null(redemption.ApprovedAt);
+        Assert.Null(redemption.DeliveredAt);
     }
 
     [Fact]
@@ -59,5 +61,48 @@ public class RedemptionTests
 
         Assert.Throws<DomainException>(() => redemption.Reject());
         Assert.Throws<DomainException>(() => redemption2.Cancel());
+    }
+
+    [Fact]
+    public void CreateNew_WithInvalidIdentifiers_ShouldThrow()
+    {
+        Assert.Throws<DomainException>(() => Redemption.CreateNew(Guid.Empty, Guid.NewGuid()));
+        Assert.Throws<DomainException>(() => Redemption.CreateNew(Guid.NewGuid(), Guid.Empty));
+    }
+
+    [Fact]
+    public void Cancel_AfterApproval_ShouldThrow()
+    {
+        var redemption = Redemption.CreateNew(Guid.NewGuid(), Guid.NewGuid());
+        redemption.Approve();
+
+        Assert.Throws<DomainException>(() => redemption.Cancel());
+    }
+
+    [Fact]
+    public void Deliver_AfterCancellationOrRejection_ShouldThrow()
+    {
+        var canceled = Redemption.CreateNew(Guid.NewGuid(), Guid.NewGuid());
+        canceled.Cancel();
+
+        var rejected = Redemption.CreateNew(Guid.NewGuid(), Guid.NewGuid());
+        rejected.Reject();
+
+        Assert.Throws<DomainException>(() => canceled.Deliver());
+        Assert.Throws<DomainException>(() => rejected.Deliver());
+    }
+
+    [Fact]
+    public void Approve_ShouldStampApprovedAtOnce()
+    {
+        var redemption = Redemption.CreateNew(Guid.NewGuid(), Guid.NewGuid());
+
+        redemption.Approve();
+
+        var firstApprovedAt = redemption.ApprovedAt;
+        Assert.NotNull(firstApprovedAt);
+
+        Assert.Throws<DomainException>(() => redemption.Approve());
+        Assert.Equal(firstApprovedAt, redemption.ApprovedAt);
     }
 }

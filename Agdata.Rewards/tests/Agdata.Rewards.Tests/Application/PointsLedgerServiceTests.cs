@@ -28,18 +28,18 @@ public class PointsLedgerServiceTests
         return (service, userRepo, eventRepo, txRepo);
     }
 
-    private static Admin CreateAdmin() => Admin.CreateNew("Teacher", "teacher@example.com", "ADMIN-10");
+    private static Admin CreateAdmin() => Admin.CreateNew("Chloe Patel", "chloe.patel@agdata.com", "AGD-ADMIN-210");
 
     [Fact]
     public async Task AllocatePoints_ShouldCreditUserAndLogTransaction()
     {
         var (service, userRepo, eventRepo, txRepo) = BuildService();
-        var user = User.CreateNew("Student", "student@example.com", "EMP-31");
-        var rewardEvent = Event.CreateNew("Hackathon", DateTimeOffset.UtcNow);
+        var user = User.CreateNew("Ravi Desai", "ravi.desai@agdata.com", "AGD-131");
+        var rewardEvent = Event.CreateNew("AGDATA Agronomy Hackathon", DateTimeOffset.UtcNow);
         userRepo.Add(user);
         eventRepo.Add(rewardEvent);
 
-    var transactionId = await service.AllocatePointsToUserForEventAsync(CreateAdmin(), user.Id, rewardEvent.Id, 100);
+        var transactionId = await service.AllocatePointsToUserForEventAsync(CreateAdmin(), user.Id, rewardEvent.Id, 100);
 
         var updatedUser = await userRepo.GetByIdAsync(user.Id);
         Assert.Equal(100, updatedUser!.TotalPoints);
@@ -52,24 +52,57 @@ public class PointsLedgerServiceTests
     public async Task AllocatePoints_WhenUserInactive_ShouldThrow()
     {
         var (service, userRepo, eventRepo, _) = BuildService();
-        var inactiveUser = new User(Guid.NewGuid(), "Inactive", new("inactive@example.com"), new("EMP-32"), isActive: false);
-        var rewardEvent = Event.CreateNew("Hackathon", DateTimeOffset.UtcNow);
+        var inactiveUser = new User(Guid.NewGuid(), "Inactive Analyst", new("inactive@agdata.com"), new("AGD-132"), isActive: false);
+        var rewardEvent = Event.CreateNew("AGDATA Agronomy Hackathon", DateTimeOffset.UtcNow);
         userRepo.Add(inactiveUser);
         eventRepo.Add(rewardEvent);
 
-    await Assert.ThrowsAsync<DomainException>(() => service.AllocatePointsToUserForEventAsync(CreateAdmin(), inactiveUser.Id, rewardEvent.Id, 10));
+        await Assert.ThrowsAsync<DomainException>(() => service.AllocatePointsToUserForEventAsync(CreateAdmin(), inactiveUser.Id, rewardEvent.Id, 10));
     }
 
     [Fact]
     public async Task AllocatePoints_WhenEventInactive_ShouldThrow()
     {
         var (service, userRepo, eventRepo, _) = BuildService();
-        var user = User.CreateNew("Student", "student2@example.com", "EMP-33");
-        var rewardEvent = Event.CreateNew("Hackathon", DateTimeOffset.UtcNow);
+        var user = User.CreateNew("Anita Gomez", "anita.gomez@agdata.com", "AGD-133");
+        var rewardEvent = Event.CreateNew("AGDATA Agronomy Hackathon", DateTimeOffset.UtcNow);
         rewardEvent.MakeInactive();
         userRepo.Add(user);
         eventRepo.Add(rewardEvent);
 
-    await Assert.ThrowsAsync<DomainException>(() => service.AllocatePointsToUserForEventAsync(CreateAdmin(), user.Id, rewardEvent.Id, 10));
+        await Assert.ThrowsAsync<DomainException>(() => service.AllocatePointsToUserForEventAsync(CreateAdmin(), user.Id, rewardEvent.Id, 10));
+    }
+
+    [Fact]
+    public async Task AllocatePoints_WhenUserMissing_ShouldThrow()
+    {
+        var (service, _, eventRepo, _) = BuildService();
+        var rewardEvent = Event.CreateNew("AGDATA Harvest Rally", DateTimeOffset.UtcNow);
+        eventRepo.Add(rewardEvent);
+
+        await Assert.ThrowsAsync<DomainException>(() => service.AllocatePointsToUserForEventAsync(CreateAdmin(), Guid.NewGuid(), rewardEvent.Id, 50));
+    }
+
+    [Fact]
+    public async Task AllocatePoints_WhenEventMissing_ShouldThrow()
+    {
+        var (service, userRepo, _, _) = BuildService();
+        var user = User.CreateNew("Evelyn Park", "evelyn.park@agdata.com", "AGD-134");
+        userRepo.Add(user);
+
+        await Assert.ThrowsAsync<DomainException>(() => service.AllocatePointsToUserForEventAsync(CreateAdmin(), user.Id, Guid.NewGuid(), 75));
+    }
+
+    [Fact]
+    public async Task AllocatePoints_WhenPointsNonPositive_ShouldThrow()
+    {
+        var (service, userRepo, eventRepo, _) = BuildService();
+        var user = User.CreateNew("Jon Rivera", "jon.rivera@agdata.com", "AGD-135");
+        var rewardEvent = Event.CreateNew("AGDATA Innovation Day", DateTimeOffset.UtcNow);
+        userRepo.Add(user);
+        eventRepo.Add(rewardEvent);
+
+        await Assert.ThrowsAsync<DomainException>(() => service.AllocatePointsToUserForEventAsync(CreateAdmin(), user.Id, rewardEvent.Id, 0));
+        await Assert.ThrowsAsync<DomainException>(() => service.AllocatePointsToUserForEventAsync(CreateAdmin(), user.Id, rewardEvent.Id, -10));
     }
 }

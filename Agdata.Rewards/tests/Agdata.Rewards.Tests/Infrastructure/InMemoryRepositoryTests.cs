@@ -1,6 +1,7 @@
 using System.Linq;
 using Agdata.Rewards.Domain.Entities;
 using Agdata.Rewards.Domain.Enums;
+using Agdata.Rewards.Domain.ValueObjects;
 using Agdata.Rewards.Infrastructure.InMemory.Repositories;
 using Xunit;
 
@@ -12,7 +13,7 @@ public class InMemoryRepositoryTests
     public async Task UserRepository_ShouldAddAndRetrieveByEmail()
     {
         var repository = new UserRepositoryInMemory();
-        var user = User.CreateNew("Learner", "learner@example.com", "EMP-50");
+        var user = User.CreateNew("Nikhil Rao", "nikhil.rao@agdata.com", "AGD-450");
         repository.Add(user);
 
         var retrieved = await repository.GetByEmailAsync(user.Email);
@@ -24,37 +25,62 @@ public class InMemoryRepositoryTests
     public async Task UserRepository_Update_ShouldPersistChanges()
     {
         var repository = new UserRepositoryInMemory();
-        var user = User.CreateNew("Learner", "learner2@example.com", "EMP-51");
+        var user = User.CreateNew("Aria Benson", "aria.benson@agdata.com", "AGD-451");
         repository.Add(user);
-        user.UpdateName("Advanced Learner");
+        user.UpdateName("Aria Benson-Field Services");
         repository.Update(user);
 
         var retrieved = await repository.GetByIdAsync(user.Id);
-        Assert.Equal("Advanced Learner", retrieved!.Name);
+        Assert.Equal("Aria Benson-Field Services", retrieved!.Name);
+    }
+
+    [Fact]
+    public async Task UserRepository_GetByEmployeeId_ShouldReturnMatch()
+    {
+        var repository = new UserRepositoryInMemory();
+        var user = User.CreateNew("Kaya Holmes", "kaya.holmes@agdata.com", "AGD-452");
+        repository.Add(user);
+
+        var retrieved = await repository.GetByEmployeeIdAsync(new EmployeeId("AGD-452"));
+
+        Assert.Equal(user.Id, retrieved!.Id);
     }
 
     [Fact]
     public async Task EventRepository_ShouldUpdateEvent()
     {
         var repository = new EventRepositoryInMemory();
-        var rewardEvent = Event.CreateNew("Seminar", DateTimeOffset.UtcNow);
+        var rewardEvent = Event.CreateNew("AGDATA Greenlight Seminar", DateTimeOffset.UtcNow);
         repository.Add(rewardEvent);
-        rewardEvent.UpdateEventName("Mega Seminar");
+        rewardEvent.UpdateEventName("AGDATA Mega Seminar");
         repository.Update(rewardEvent);
 
         var retrieved = await repository.GetByIdAsync(rewardEvent.Id);
-        Assert.Equal("Mega Seminar", retrieved!.Name);
+        Assert.Equal("AGDATA Mega Seminar", retrieved!.Name);
     }
 
     [Fact]
     public async Task ProductRepository_GetAll_ShouldReturnEntries()
     {
         var repository = new ProductRepositoryInMemory();
-        repository.Add(Product.CreateNew("Sticker", 50));
-        repository.Add(Product.CreateNew("Badge", 75));
+        repository.Add(Product.CreateNew("AGDATA Field Sticker", 50));
+        repository.Add(Product.CreateNew("AGDATA Badge", 75));
 
         var all = await repository.GetAllAsync();
         Assert.Equal(2, all.Count());
+    }
+
+    [Fact]
+    public async Task ProductRepository_Delete_ShouldRemoveProduct()
+    {
+        var repository = new ProductRepositoryInMemory();
+        var product = Product.CreateNew("AGDATA Soil Kit", 600);
+        repository.Add(product);
+
+        repository.Delete(product.Id);
+
+        var retrieved = await repository.GetByIdAsync(product.Id);
+        Assert.Null(retrieved);
     }
 
     [Fact]

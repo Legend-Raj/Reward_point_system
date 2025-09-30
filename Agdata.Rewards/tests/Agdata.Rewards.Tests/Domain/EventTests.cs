@@ -37,4 +37,48 @@ public class EventTests
 
         Assert.Throws<DomainException>(() => rewardEvent.UpdateEventName(" "));
     }
+
+    [Fact]
+    public void CreateNew_WithBlankName_ShouldThrow()
+    {
+        Assert.Throws<DomainException>(() => Event.CreateNew(" ", DateTimeOffset.UtcNow));
+    }
+
+    [Fact]
+    public void Ctor_WithEmptyId_ShouldThrow()
+    {
+        Assert.Throws<DomainException>(() => new Event(Guid.Empty, "Dealer Workshop", DateTimeOffset.UtcNow));
+    }
+
+    [Fact]
+    public void UpdateEventName_ShouldTrimInput()
+    {
+        var rewardEvent = Event.CreateNew("Quarterly Brief", DateTimeOffset.UtcNow);
+
+        rewardEvent.UpdateEventName("  AGDATA Roadshow  ");
+
+        Assert.Equal("AGDATA Roadshow", rewardEvent.Name);
+    }
+
+    [Fact]
+    public void ChangeEventDateTime_ShouldPersistNewTimestamp()
+    {
+        var rewardEvent = Event.CreateNew("Dealer Summit", DateTimeOffset.UtcNow);
+        var newSchedule = DateTimeOffset.UtcNow.AddMonths(1);
+
+        rewardEvent.ChangeEventDateTime(newSchedule);
+
+        Assert.Equal(newSchedule, rewardEvent.OccurredAt);
+    }
+
+    [Fact]
+    public void MakeActive_ShouldReactivateEvent()
+    {
+        var rewardEvent = Event.CreateNew("Legacy Expo", DateTimeOffset.UtcNow);
+        rewardEvent.MakeInactive();
+
+        rewardEvent.MakeActive();
+
+        Assert.True(rewardEvent.IsActive);
+    }
 }

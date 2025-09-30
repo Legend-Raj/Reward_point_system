@@ -13,6 +13,13 @@ public class ValueObjectTests
         Assert.Equal("person@example.com", email.Value);
 
         Assert.Throws<DomainException>(() => new Email("not-an-email"));
+        Assert.Throws<DomainException>(() => new Email(" "));
+    }
+
+    [Fact]
+    public void Email_WithSurroundingWhitespace_ShouldThrow()
+    {
+        Assert.Throws<DomainException>(() => new Email("   analyst@agdata.com   "));
     }
 
     [Fact]
@@ -29,7 +36,9 @@ public class ValueObjectTests
     {
         var email1 = new Email("a@b.com");
         var email2 = new Email("a@b.com");
+        var email3 = new Email("c@d.com");
 
         Assert.Equal(email1, email2);
+        Assert.NotEqual(email1, email3);
     }
 }

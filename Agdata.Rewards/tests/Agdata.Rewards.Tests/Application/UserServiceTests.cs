@@ -18,7 +18,7 @@ public class UserServiceTests
         var repository = new UserRepositoryInMemory();
         var service = BuildService(repository);
 
-        var user = await service.CreateNewUserAsync("Nina", "nina@example.com", "EMP-21");
+        var user = await service.CreateNewUserAsync("Priya Singh", "priya.singh@agdata.com", "AGD-321");
 
         Assert.Equal(user.Id, (await repository.GetByIdAsync(user.Id))?.Id);
     }
@@ -28,9 +28,9 @@ public class UserServiceTests
     {
         var repository = new UserRepositoryInMemory();
         var service = BuildService(repository);
-        repository.Add(User.CreateNew("Existing", "dup@example.com", "EMP-22"));
+        repository.Add(User.CreateNew("Existing", "duplication@agdata.com", "AGD-322"));
 
-        await Assert.ThrowsAsync<DomainException>(() => service.CreateNewUserAsync("Another", "dup@example.com", "EMP-23"));
+        await Assert.ThrowsAsync<DomainException>(() => service.CreateNewUserAsync("Another", "duplication@agdata.com", "AGD-923"));
     }
 
     [Fact]
@@ -38,8 +38,17 @@ public class UserServiceTests
     {
         var repository = new UserRepositoryInMemory();
         var service = BuildService(repository);
-        repository.Add(User.CreateNew("Existing", "existing@example.com", "EMP-24"));
+        repository.Add(User.CreateNew("Existing", "existing@agdata.com", "AGD-324"));
 
-        await Assert.ThrowsAsync<DomainException>(() => service.CreateNewUserAsync("Another", "new@example.com", "EMP-24"));
+        await Assert.ThrowsAsync<DomainException>(() => service.CreateNewUserAsync("Another", "new@agdata.com", "AGD-324"));
+    }
+
+    [Fact]
+    public async Task CreateNewUserAsync_WithInvalidEmail_ShouldThrow()
+    {
+        var repository = new UserRepositoryInMemory();
+        var service = BuildService(repository);
+
+        await Assert.ThrowsAsync<DomainException>(() => service.CreateNewUserAsync("Invalid", "not-an-email", "AGD-400"));
     }
 }
