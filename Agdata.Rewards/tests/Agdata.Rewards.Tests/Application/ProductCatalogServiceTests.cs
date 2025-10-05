@@ -1,3 +1,6 @@
+using System;
+using System.Linq;
+using System.Threading.Tasks;
 using Agdata.Rewards.Application.Services;
 using Agdata.Rewards.Domain.Entities;
 using Agdata.Rewards.Domain.Exceptions;
@@ -12,34 +15,78 @@ public class ProductCatalogServiceTests
     private static ProductCatalogService BuildService(ProductRepositoryInMemory productRepo, RedemptionRepositoryInMemory redemptionRepo)
         => new(productRepo, redemptionRepo, new InMemoryUnitOfWork());
 
-    private static Admin CreateAdmin() => Admin.CreateNew("Naomi Fields", "naomi.fields@agdata.com", "AGD-ADMIN-220");
-
     [Fact]
-    public async Task AddNewProductAsync_ShouldPersistProduct()
-    {
-    var productRepo = new ProductRepositoryInMemory();
-    var service = BuildService(productRepo, new RedemptionRepositoryInMemory());
-
-    var productId = await service.AddNewProductAsync(CreateAdmin(), "AGDATA Field Jacket", 1200, 20);
-        var stored = await productRepo.GetByIdAsync(productId);
-
-        Assert.NotNull(stored);
-    Assert.Equal("AGDATA Field Jacket", stored!.Name);
-    }
-
-    [Fact]
-    public async Task UpdateProductDetailsAsync_ShouldApplyChanges()
+    public async Task CreateProductAsync_ShouldPersistProduct()
     {
         var productRepo = new ProductRepositoryInMemory();
         var service = BuildService(productRepo, new RedemptionRepositoryInMemory());
-        var productId = await service.AddNewProductAsync(CreateAdmin(), "AGDATA Coffee Cup", 150, 10);
 
-        await service.UpdateProductDetailsAsync(CreateAdmin(), productId, "AGDATA Steel Tumbler", 180, 5);
-        var updated = await productRepo.GetByIdAsync(productId);
+        var product = await service.CreateProductAsync("AGDATA Field Jacket", 1200, 20, true);
 
-        Assert.Equal("AGDATA Steel Tumbler", updated!.Name);
-        Assert.Equal(180, updated.RequiredPoints);
+        var stored = await productRepo.GetByIdAsync(product.Id);
+        Assert.NotNull(stored);
+        Assert.Equal("AGDATA Field Jacket", stored!.Name);
+        Assert.True(stored.IsActive);
+    }
+
+    [Fact]
+    public async Task CreateProductAsync_WhenStockIsNull_ShouldSupportUnlimitedInventory()
+    {
+        var productRepo = new ProductRepositoryInMemory();
+        var service = BuildService(productRepo, new RedemptionRepositoryInMemory());
+
+        var product = await service.CreateProductAsync("AGDATA Legacy Pin", 75, null, true);
+
+        Assert.Null(product.Stock);
+        var persisted = await productRepo.GetByIdAsync(product.Id);
+        Assert.NotNull(persisted);
+        Assert.Null(persisted!.Stock);
+    }
+
+    [Fact]
+    public async Task CreateProductAsync_WhenMarkedInactive_ShouldExcludeFromDefaultCatalog()
+    {
+        var productRepo = new ProductRepositoryInMemory();
+        var service = BuildService(productRepo, new RedemptionRepositoryInMemory());
+        var inactive = await service.CreateProductAsync("AGDATA Collector Edition", 3000, 1, false);
+        var active = await service.CreateProductAsync("AGDATA Field Notebook", 90, null, true);
+
+        var defaultCatalog = await service.GetCatalogAsync();
+        Assert.DoesNotContain(defaultCatalog, product => product.Id == inactive.Id);
+        Assert.Contains(defaultCatalog, product => product.Id == active.Id);
+
+        var fullCatalog = await service.GetCatalogAsync(onlyActive: false);
+        Assert.Contains(fullCatalog, product => product.Id == inactive.Id);
+        Assert.Contains(fullCatalog, product => product.Id == active.Id);
+    }
+
+    [Fact]
+    public async Task UpdateProductAsync_ShouldApplyPartialChanges()
+    {
+        var productRepo = new ProductRepositoryInMemory();
+        var service = BuildService(productRepo, new RedemptionRepositoryInMemory());
+        var product = await service.CreateProductAsync("AGDATA Coffee Cup", 150, 10, true);
+
+        var updated = await service.UpdateProductAsync(product.Id, "AGDATA Steel Tumbler", null, 5, false);
+
+        Assert.Equal("AGDATA Steel Tumbler", updated.Name);
+        Assert.Equal(150, updated.RequiredPoints);
         Assert.Equal(5, updated.Stock);
+        Assert.False(updated.IsActive);
+    }
+
+    [Fact]
+    public async Task UpdateProductAsync_WhenReactivating_ShouldReturnProductToActiveCatalog()
+    {
+        var productRepo = new ProductRepositoryInMemory();
+        var service = BuildService(productRepo, new RedemptionRepositoryInMemory());
+        var product = await service.CreateProductAsync("AGDATA Windbreaker", 400, 3, false);
+
+        var reactivated = await service.UpdateProductAsync(product.Id, null, null, null, true);
+
+        Assert.True(reactivated.IsActive);
+        var catalog = await service.GetCatalogAsync();
+        Assert.Contains(catalog, p => p.Id == product.Id);
     }
 
     [Fact]
@@ -47,13 +94,12 @@ public class ProductCatalogServiceTests
     {
         var productRepo = new ProductRepositoryInMemory();
         var redemptionRepo = new RedemptionRepositoryInMemory();
-    var service = BuildService(productRepo, redemptionRepo);
-    var productId = await service.AddNewProductAsync(CreateAdmin(), "AGDATA Drone", 2500, 5);
-        var userId = Guid.NewGuid();
-        var pending = Redemption.CreateNew(userId, productId);
+        var service = BuildService(productRepo, redemptionRepo);
+        var product = await service.CreateProductAsync("AGDATA Drone", 2500, 5, true);
+        var pending = Redemption.CreateNew(Guid.NewGuid(), product.Id);
         redemptionRepo.Add(pending);
 
-        await Assert.ThrowsAsync<DomainException>(() => service.DeleteProductAsync(CreateAdmin(), productId));
+        await Assert.ThrowsAsync<DomainException>(() => service.DeleteProductAsync(product.Id));
     }
 
     [Fact]
@@ -61,47 +107,36 @@ public class ProductCatalogServiceTests
     {
         var productRepo = new ProductRepositoryInMemory();
         var service = BuildService(productRepo, new RedemptionRepositoryInMemory());
-        var productId = await service.AddNewProductAsync(CreateAdmin(), "AGDATA Hydro Bottle", 220, 5);
+        var product = await service.CreateProductAsync("AGDATA Hydro Bottle", 220, 5, true);
 
-        await service.DeleteProductAsync(CreateAdmin(), productId);
-        var retrieved = await productRepo.GetByIdAsync(productId);
+        await service.DeleteProductAsync(product.Id);
 
-        Assert.Null(retrieved);
+        Assert.Null(await productRepo.GetByIdAsync(product.Id));
     }
 
     [Fact]
-    public async Task UpdateProductDetailsAsync_WhenMissing_ShouldThrow()
+    public async Task UpdateProductAsync_WhenMissing_ShouldThrow()
     {
         var productRepo = new ProductRepositoryInMemory();
         var service = BuildService(productRepo, new RedemptionRepositoryInMemory());
 
-        await Assert.ThrowsAsync<DomainException>(() => service.UpdateProductDetailsAsync(CreateAdmin(), Guid.NewGuid(), "AGDATA Hoodie", 400, 10));
+        await Assert.ThrowsAsync<DomainException>(() => service.UpdateProductAsync(Guid.NewGuid(), "AGDATA Hoodie", 400, 10, null));
     }
 
     [Fact]
-    public async Task ActivateAndDeactivateProduct_ShouldToggleState()
+    public async Task GetCatalogAsync_ShouldRespectOnlyActiveFilter()
     {
         var productRepo = new ProductRepositoryInMemory();
         var service = BuildService(productRepo, new RedemptionRepositoryInMemory());
-        var productId = await service.AddNewProductAsync(CreateAdmin(), "AGDATA Soil Kit", 900, 15);
+        var active = await service.CreateProductAsync("AGDATA Soil Kit", 900, 15, true);
+        var inactive = await service.CreateProductAsync("AGDATA Prototype", 1500, 2, false);
 
-        await service.DeactivateProductAsync(CreateAdmin(), productId);
-        Assert.False((await productRepo.GetByIdAsync(productId))!.IsActive);
+        var activeOnly = await service.GetCatalogAsync();
+        Assert.Single(activeOnly);
+        Assert.Equal(active.Id, activeOnly.First().Id);
 
-        await service.ActivateProductAsync(CreateAdmin(), productId);
-        Assert.True((await productRepo.GetByIdAsync(productId))!.IsActive);
-    }
-
-    [Fact]
-    public async Task DeleteProductAsync_WhenMissing_ShouldNoOp()
-    {
-        var productRepo = new ProductRepositoryInMemory();
-        var service = BuildService(productRepo, new RedemptionRepositoryInMemory());
-
-        var missingProductId = Guid.NewGuid();
-
-        await service.DeleteProductAsync(CreateAdmin(), missingProductId);
-
-        Assert.Null(await productRepo.GetByIdAsync(missingProductId));
+        var all = await service.GetCatalogAsync(onlyActive: false);
+        Assert.Equal(2, all.Count);
+        Assert.Contains(all, p => p.Id == inactive.Id);
     }
 }

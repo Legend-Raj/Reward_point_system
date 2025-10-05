@@ -1,3 +1,7 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using Agdata.Rewards.Application.Interfaces;
 using Agdata.Rewards.Application.Interfaces.Repositories;
 using Agdata.Rewards.Application.Interfaces.Services;
@@ -26,8 +30,13 @@ public class PointsLedgerService : IPointsLedgerService
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<Guid> AllocatePointsToUserForEventAsync(Admin allocator, Guid userId, Guid eventId, int points)
+    public async Task<PointsTransaction> EarnAsync(Guid userId, Guid eventId, int points)
     {
+        if (points <= 0)
+        {
+            throw new DomainException("Points must be a positive amount.");
+        }
+
         var userAccount = await _userRepository.GetByIdAsync(userId)
             ?? throw new DomainException("Cannot allocate points to a non-existent user.");
 
@@ -60,11 +69,55 @@ public class PointsLedgerService : IPointsLedgerService
 
         await _unitOfWork.SaveChangesAsync();
 
-        return pointsTransaction.Id;
+        return pointsTransaction;
     }
 
-    public Task<IEnumerable<PointsTransaction>> GetUserTransactionHistoryAsync(Guid userId)
+    public async Task<IReadOnlyList<PointsTransaction>> GetUserTransactionHistoryAsync(Guid userId)
     {
-        throw new NotImplementedException("Add IPointsTransactionRepository.GetByUserIdAsync to surface history.");
+        var user = await _userRepository.GetByIdAsync(userId)
+            ?? throw new DomainException("Cannot fetch history for a non-existent user.");
+
+        return await _pointsTransactionRepository.GetByUserIdAsync(user.Id);
+    }
+
+    public async Task<Event> CreateEventAsync(string name, bool isActive = true)
+    {
+        var newEvent = Event.CreateNew(name, DateTimeOffset.UtcNow);
+
+        if (!isActive)
+        {
+            newEvent.MakeInactive();
+        }
+
+        _eventRepository.Add(newEvent);
+        await _unitOfWork.SaveChangesAsync();
+        return newEvent;
+    }
+
+    public async Task<IReadOnlyList<Event>> ListEventsAsync(bool onlyActive = true)
+    {
+        var events = await _eventRepository.GetAllAsync();
+        var filtered = onlyActive ? events.Where(ev => ev.IsActive) : events;
+        return filtered.ToList();
+    }
+
+    public async Task<Event> SetEventActiveAsync(Guid eventId, bool isActive)
+    {
+        var rewardEvent = await _eventRepository.GetByIdAsync(eventId)
+            ?? throw new DomainException("Event not found.");
+
+        if (isActive)
+        {
+            rewardEvent.MakeActive();
+        }
+        else
+        {
+            rewardEvent.MakeInactive();
+        }
+
+        _eventRepository.Update(rewardEvent);
+        await _unitOfWork.SaveChangesAsync();
+
+        return rewardEvent;
     }
 }

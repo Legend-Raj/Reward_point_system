@@ -1,13 +1,13 @@
+using System.Collections.Generic;
+using System.Threading.Tasks;
 using Agdata.Rewards.Domain.Entities;
 
 namespace Agdata.Rewards.Application.Interfaces.Services;
 
 public interface IProductCatalogService
 {
-    Task<Guid> AddNewProductAsync(Admin creator, string name, int requiredPoints, int? stock);
-    Task UpdateProductDetailsAsync(Admin editor, Guid productId, string name, int requiredPoints, int? stock);
-    Task DeactivateProductAsync(Admin editor, Guid productId);
-    Task ActivateProductAsync(Admin editor, Guid productId);
-    Task DeleteProductAsync(Admin deleter, Guid productId);
-    Task<IEnumerable<Product>> GetFullCatalogAsync();
+    Task<Product> CreateProductAsync(string name, int requiredPoints, int? stock, bool isActive = true);
+    Task<Product> UpdateProductAsync(Guid productId, string? name, int? requiredPoints, int? stock, bool? isActive);
+    Task DeleteProductAsync(Guid productId);
+    Task<IReadOnlyList<Product>> GetCatalogAsync(bool onlyActive = true);
 }

@@ -1,3 +1,7 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using Agdata.Rewards.Application.Interfaces;
 using Agdata.Rewards.Application.Interfaces.Repositories;
 using Agdata.Rewards.Application.Interfaces.Services;
@@ -22,48 +26,59 @@ public class ProductCatalogService : IProductCatalogService
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<Guid> AddNewProductAsync(Admin creator, string name, int requiredPoints, int? stock)
+    public async Task<Product> CreateProductAsync(string name, int requiredPoints, int? stock, bool isActive = true)
     {
         var product = Product.CreateNew(name, requiredPoints, stock);
+
+        if (!isActive)
+        {
+            product.MakeInactive();
+        }
+
         _productRepository.Add(product);
         await _unitOfWork.SaveChangesAsync();
-        return product.Id;
+        return product;
     }
 
-    public async Task UpdateProductDetailsAsync(Admin editor, Guid productId, string name, int requiredPoints, int? stock)
+    public async Task<Product> UpdateProductAsync(Guid productId, string? name, int? requiredPoints, int? stock, bool? isActive)
     {
         var product = await _productRepository.GetByIdAsync(productId)
             ?? throw new DomainException("Product not found.");
 
-        product.UpdateProductDetails(name, requiredPoints, stock);
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            product.ChangeName(name);
+        }
+
+        if (requiredPoints.HasValue)
+        {
+            product.UpdatePointsCost(requiredPoints.Value);
+        }
+
+        if (stock.HasValue)
+        {
+            product.UpdateStockQuantity(stock);
+        }
+
+        if (isActive.HasValue)
+        {
+            if (isActive.Value)
+            {
+                product.MakeActive();
+            }
+            else
+            {
+                product.MakeInactive();
+            }
+        }
 
         _productRepository.Update(product);
         await _unitOfWork.SaveChangesAsync();
+
+        return product;
     }
 
-    public async Task DeactivateProductAsync(Admin editor, Guid productId)
-    {
-        var product = await _productRepository.GetByIdAsync(productId)
-            ?? throw new DomainException("Product not found.");
-
-        product.MakeInactive();
-
-        _productRepository.Update(product);
-        await _unitOfWork.SaveChangesAsync();
-    }
-
-    public async Task ActivateProductAsync(Admin editor, Guid productId)
-    {
-        var product = await _productRepository.GetByIdAsync(productId)
-            ?? throw new DomainException("Product not found.");
-
-        product.MakeActive();
-
-        _productRepository.Update(product);
-        await _unitOfWork.SaveChangesAsync();
-    }
-
-    public async Task DeleteProductAsync(Admin deleter, Guid productId)
+    public async Task DeleteProductAsync(Guid productId)
     {
         if (await _redemptionRepository.AnyPendingRedemptionsForProductAsync(productId))
         {
@@ -74,8 +89,13 @@ public class ProductCatalogService : IProductCatalogService
         await _unitOfWork.SaveChangesAsync();
     }
 
-    public async Task<IEnumerable<Product>> GetFullCatalogAsync()
+    public async Task<IReadOnlyList<Product>> GetCatalogAsync(bool onlyActive = true)
     {
-        return await _productRepository.GetAllAsync();
+        var allProducts = await _productRepository.GetAllAsync();
+        var filtered = onlyActive
+            ? allProducts.Where(product => product.IsActive)
+            : allProducts;
+
+        return filtered.ToList();
     }
 }

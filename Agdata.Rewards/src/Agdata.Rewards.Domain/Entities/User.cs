@@ -6,8 +6,8 @@ namespace Agdata.Rewards.Domain.Entities;
 public class User
 {
     public Guid Id { get; }
-    public Email Email { get; }
-    public EmployeeId EmployeeId { get; }
+    public Email Email { get; private set; }
+    public EmployeeId EmployeeId { get; private set; }
     public string Name { get; private set; }
     public bool IsActive { get; private set; }
 
@@ -52,6 +52,16 @@ public class User
     public void DeactivateAccount()
     {
         IsActive = false;
+    }
+
+    public void UpdateEmail(Email newEmail)
+    {
+        Email = newEmail ?? throw new DomainException("Email is required.");
+    }
+
+    public void UpdateEmployeeId(EmployeeId newEmployeeId)
+    {
+        EmployeeId = newEmployeeId ?? throw new DomainException("EmployeeId is required.");
     }
 
     public void AddPoints(int points)

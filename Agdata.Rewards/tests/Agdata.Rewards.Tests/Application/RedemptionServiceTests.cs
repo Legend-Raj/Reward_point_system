@@ -1,3 +1,7 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using Agdata.Rewards.Application.Interfaces.Repositories;
 using Agdata.Rewards.Application.Services;
 using Agdata.Rewards.Domain.Entities;
@@ -15,6 +19,17 @@ public class RedemptionServiceTests
     {
         public List<PointsTransaction> Transactions { get; } = new();
         public void Add(PointsTransaction transaction) => Transactions.Add(transaction);
+
+        public Task<IReadOnlyList<PointsTransaction>> GetByUserIdAsync(Guid userId)
+        {
+            var results = Transactions
+                .Where(tx => tx.UserId == userId)
+                .OrderBy(tx => tx.Timestamp)
+                .ToList()
+                .AsReadOnly();
+
+            return Task.FromResult<IReadOnlyList<PointsTransaction>>(results);
+        }
     }
 
     private static (RedemptionService service, UserRepositoryInMemory users, ProductRepositoryInMemory products, RedemptionRepositoryInMemory redemptions, CapturingPointsTransactionRepository txRepo)
@@ -35,10 +50,10 @@ public class RedemptionServiceTests
     public async Task RequestRedemptionAsync_ShouldLockPointsAndCreatePending()
     {
         var (service, users, products, redemptions, _) = BuildService();
-    var user = User.CreateNew("Jada Holmes", "jada.holmes@agdata.com", "AGD-241");
+        var user = User.CreateNew("Jada Holmes", "jada.holmes@agdata.com", "AGD-241");
         user.AddPoints(1000);
         users.Add(user);
-    var product = Product.CreateNew("AGDATA Scout Tablet", 500, stock: 5);
+        var product = Product.CreateNew("AGDATA Scout Tablet", 500, stock: 5);
         products.Add(product);
 
         var redemptionId = await service.RequestRedemptionAsync(user.Id, product.Id);
@@ -124,6 +139,26 @@ public class RedemptionServiceTests
         Assert.Equal(0, updatedUser.LockedPoints);
         Assert.Equal(1, updatedProduct!.Stock);
         Assert.Equal(RedemptionStatus.Delivered, updatedRedemption!.Status);
+        Assert.Single(txRepo.Transactions);
+        Assert.Equal(TransactionType.Redeem, txRepo.Transactions[0].Type);
+    }
+
+    [Fact]
+    public async Task DeliverRedemptionAsync_WhenStockUnlimited_ShouldLeaveStockUnchanged()
+    {
+        var (service, users, products, redemptions, txRepo) = BuildService();
+        var user = User.CreateNew("Adrian Blake", "adrian.blake@agdata.com", "AGD-260");
+        user.AddPoints(800);
+        users.Add(user);
+        var product = Product.CreateNew("AGDATA Executive Membership", 500, stock: null);
+        products.Add(product);
+        var redemptionId = await service.RequestRedemptionAsync(user.Id, product.Id);
+        await service.ApproveRedemptionAsync(CreateAdmin(), redemptionId);
+
+        await service.DeliverRedemptionAsync(CreateAdmin(), redemptionId);
+
+        var persistedProduct = await products.GetByIdAsync(product.Id);
+        Assert.Null(persistedProduct!.Stock);
         Assert.Single(txRepo.Transactions);
         Assert.Equal(TransactionType.Redeem, txRepo.Transactions[0].Type);
     }
