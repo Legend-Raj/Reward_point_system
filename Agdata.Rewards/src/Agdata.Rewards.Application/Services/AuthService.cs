@@ -1,7 +1,9 @@
-using Agdata.Rewards.Application.Interfaces;
+using System;
+using System.Threading.Tasks;
 using Agdata.Rewards.Application.Interfaces.Auth;
 using Agdata.Rewards.Application.Interfaces.Repositories;
 using Agdata.Rewards.Domain.Entities;
+using Agdata.Rewards.Domain.Exceptions;
 using Agdata.Rewards.Domain.ValueObjects;
 
 namespace Agdata.Rewards.Application.Services;
@@ -10,32 +12,40 @@ public class AuthService : IAuthService
 {
     private readonly IUserRepository _userRepository;
     private readonly IAdminRegistry _adminRegistry;
-    private readonly IUnitOfWork _unitOfWork;
 
-    public AuthService(IUserRepository userRepository, IAdminRegistry adminRegistry, IUnitOfWork unitOfWork)
+    public AuthService(IUserRepository userRepository, IAdminRegistry adminRegistry)
     {
         _userRepository = userRepository;
         _adminRegistry = adminRegistry;
-        _unitOfWork = unitOfWork;
     }
 
-    public async Task<User> ProvisionUserAsync(string name, string email, string employeeId)
+    public async Task<User> AuthenticateAsync(string email, string employeeId)
     {
         var emailAddress = new Email(email);
-        var existingUser = await _userRepository.GetByEmailAsync(emailAddress);
+        var employeeIdentifier = new EmployeeId(employeeId);
 
-        if (existingUser is not null)
+        var user = await _userRepository.GetUserByEmailAsync(emailAddress)
+            ?? await _userRepository.GetUserByEmployeeIdAsync(employeeIdentifier)
+            ?? throw new DomainException(DomainErrors.User.NotFound);
+
+        if (!user.IsActive)
         {
-            return existingUser;
+            throw new DomainException(DomainErrors.User.AccountInactive);
         }
 
-        var newAccount = _adminRegistry.IsAdmin(email, employeeId)
-            ? Admin.CreateNew(name, email, employeeId)
-            : User.CreateNew(name, email, employeeId);
+        var emailMatches = string.Equals(user.Email.Value, emailAddress.Value, StringComparison.OrdinalIgnoreCase);
+        var employeeMatches = string.Equals(user.EmployeeId.Value, employeeIdentifier.Value, StringComparison.OrdinalIgnoreCase);
 
-        _userRepository.Add(newAccount);
-        await _unitOfWork.SaveChangesAsync();
+        if (!emailMatches && !employeeMatches)
+        {
+            throw new DomainException(DomainErrors.Authorization.InvalidCredentials);
+        }
 
-        return newAccount;
+        return user;
+    }
+
+    public bool IsAdmin(string email, string employeeId)
+    {
+        return _adminRegistry.IsAdmin(email, employeeId);
     }
 }

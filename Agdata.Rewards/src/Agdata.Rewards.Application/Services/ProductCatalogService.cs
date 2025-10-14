@@ -13,12 +13,12 @@ namespace Agdata.Rewards.Application.Services;
 public class ProductCatalogService : IProductCatalogService
 {
     private readonly IProductRepository _productRepository;
-    private readonly IRedemptionRepository _redemptionRepository;
+    private readonly IRedemptionRequestRepository _redemptionRepository;
     private readonly IUnitOfWork _unitOfWork;
 
     public ProductCatalogService(
         IProductRepository productRepository,
-        IRedemptionRepository redemptionRepository,
+        IRedemptionRequestRepository redemptionRepository,
         IUnitOfWork unitOfWork)
     {
         _productRepository = productRepository;
@@ -26,34 +26,26 @@ public class ProductCatalogService : IProductCatalogService
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<Product> CreateProductAsync(string name, int requiredPoints, int? stock, bool isActive = true)
+    public async Task<Product> CreateProductAsync(string name, string? description, int pointsCost, string? imageUrl, int? stock, bool isActive = true)
     {
-        var product = Product.CreateNew(name, requiredPoints, stock);
+        var product = Product.CreateNew(name, pointsCost, stock, description, imageUrl, isActive);
 
-        if (!isActive)
-        {
-            product.MakeInactive();
-        }
-
-        _productRepository.Add(product);
+        _productRepository.AddProduct(product);
         await _unitOfWork.SaveChangesAsync();
         return product;
     }
 
-    public async Task<Product> UpdateProductAsync(Guid productId, string? name, int? requiredPoints, int? stock, bool? isActive)
+    public async Task<Product> UpdateProductAsync(Guid productId, string? name, string? description, int? pointsCost, string? imageUrl, int? stock, bool? isActive)
     {
-        var product = await _productRepository.GetByIdAsync(productId)
-            ?? throw new DomainException("Product not found.");
+        var product = await _productRepository.GetProductByIdAsync(productId)
+            ?? throw new DomainException(DomainErrors.Product.NotFound);
 
-        if (!string.IsNullOrWhiteSpace(name))
-        {
-            product.ChangeName(name);
-        }
+        var mergedName = name ?? product.Name;
+        var mergedDescription = description ?? product.Description;
+        var mergedPointsCost = pointsCost ?? product.PointsCost;
+        var mergedImageUrl = imageUrl ?? product.ImageUrl;
 
-        if (requiredPoints.HasValue)
-        {
-            product.UpdatePointsCost(requiredPoints.Value);
-        }
+    product.ApplyDetails(mergedName, mergedDescription, mergedPointsCost, mergedImageUrl);
 
         if (stock.HasValue)
         {
@@ -72,7 +64,46 @@ public class ProductCatalogService : IProductCatalogService
             }
         }
 
-        _productRepository.Update(product);
+        _productRepository.UpdateProduct(product);
+        await _unitOfWork.SaveChangesAsync();
+
+        return product;
+    }
+
+    public async Task<Product> SetStockQuantityAsync(Guid productId, int? stock)
+    {
+        var product = await _productRepository.GetProductByIdAsync(productId)
+            ?? throw new DomainException(DomainErrors.Product.NotFound);
+
+        product.UpdateStockQuantity(stock);
+
+        _productRepository.UpdateProduct(product);
+        await _unitOfWork.SaveChangesAsync();
+
+        return product;
+    }
+
+    public async Task<Product> IncrementStockAsync(Guid productId, int quantity)
+    {
+        var product = await _productRepository.GetProductByIdAsync(productId)
+            ?? throw new DomainException(DomainErrors.Product.NotFound);
+
+        product.IncrementStock(quantity);
+
+        _productRepository.UpdateProduct(product);
+        await _unitOfWork.SaveChangesAsync();
+
+        return product;
+    }
+
+    public async Task<Product> DecrementStockAsync(Guid productId, int quantity)
+    {
+        var product = await _productRepository.GetProductByIdAsync(productId)
+            ?? throw new DomainException(DomainErrors.Product.NotFound);
+
+        product.DecrementStock(quantity);
+
+        _productRepository.UpdateProduct(product);
         await _unitOfWork.SaveChangesAsync();
 
         return product;
@@ -80,18 +111,18 @@ public class ProductCatalogService : IProductCatalogService
 
     public async Task DeleteProductAsync(Guid productId)
     {
-        if (await _redemptionRepository.AnyPendingRedemptionsForProductAsync(productId))
+        if (await _redemptionRepository.AnyPendingRedemptionRequestsForProductAsync(productId))
         {
-            throw new DomainException("Product cannot be deleted as it has pending redemptions.");
+            throw new DomainException(DomainErrors.Product.CannotDeleteWithPending);
         }
 
-        _productRepository.Delete(productId);
+        _productRepository.DeleteProduct(productId);
         await _unitOfWork.SaveChangesAsync();
     }
 
     public async Task<IReadOnlyList<Product>> GetCatalogAsync(bool onlyActive = true)
     {
-        var allProducts = await _productRepository.GetAllAsync();
+        var allProducts = await _productRepository.ListProductsAsync();
         var filtered = onlyActive
             ? allProducts.Where(product => product.IsActive)
             : allProducts;

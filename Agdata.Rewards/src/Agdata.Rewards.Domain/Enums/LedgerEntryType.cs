@@ -1,6 +1,6 @@
 namespace Agdata.Rewards.Domain.Enums;
 
-public enum TransactionType
+public enum LedgerEntryType
 {
     Earn,
     Redeem

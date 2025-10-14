@@ -12,11 +12,19 @@ public sealed record Email
 
     public Email(string value)
     {
-        if (string.IsNullOrWhiteSpace(value) || !Pattern.IsMatch(value))
+        if (string.IsNullOrWhiteSpace(value))
         {
-            throw new DomainException("Invalid email address.");
+            throw new DomainException(DomainErrors.EmailRequired);
         }
-        Value = value.Trim();
+
+        var trimmed = value.Trim();
+
+        if (!Pattern.IsMatch(trimmed))
+        {
+            throw new DomainException(DomainErrors.InvalidEmailFormat);
+        }
+
+        Value = trimmed;
     }
 
     public override string ToString() => Value;

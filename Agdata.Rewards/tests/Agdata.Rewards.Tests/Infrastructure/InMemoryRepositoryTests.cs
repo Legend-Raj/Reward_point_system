@@ -1,8 +1,12 @@
+using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Agdata.Rewards.Domain.Entities;
 using Agdata.Rewards.Domain.Enums;
 using Agdata.Rewards.Domain.ValueObjects;
 using Agdata.Rewards.Infrastructure.InMemory.Repositories;
+using Agdata.Rewards.Tests.Common;
 using Xunit;
 
 namespace Agdata.Rewards.Tests.Infrastructure;
@@ -13,10 +17,10 @@ public class InMemoryRepositoryTests
     public async Task UserRepository_ShouldAddAndRetrieveByEmail()
     {
         var repository = new UserRepositoryInMemory();
-        var user = User.CreateNew("Nikhil Rao", "nikhil.rao@agdata.com", "AGD-450");
-        repository.Add(user);
+        var user = CreateUser("Nikhil Rao", "nikhil.rao@agdata.com", "AGD-450");
+        repository.AddUser(user);
 
-        var retrieved = await repository.GetByEmailAsync(user.Email);
+        var retrieved = await repository.GetUserByEmailAsync(user.Email);
 
         Assert.Equal(user.Id, retrieved!.Id);
     }
@@ -25,23 +29,23 @@ public class InMemoryRepositoryTests
     public async Task UserRepository_Update_ShouldPersistChanges()
     {
         var repository = new UserRepositoryInMemory();
-        var user = User.CreateNew("Aria Benson", "aria.benson@agdata.com", "AGD-451");
-        repository.Add(user);
-        user.UpdateName("Aria Benson-Field Services");
-        repository.Update(user);
+        var user = CreateUser("Aria Benson", "aria.benson@agdata.com", "AGD-451");
+        repository.AddUser(user);
+    user.Rename(CreatePersonName("Aria Benson-Field Services"));
+        repository.UpdateUser(user);
 
-        var retrieved = await repository.GetByIdAsync(user.Id);
-        Assert.Equal("Aria Benson-Field Services", retrieved!.Name);
+        var retrieved = await repository.GetUserByIdAsync(user.Id);
+        Assert.Equal("Aria Benson-Field Services", retrieved!.Name.FullName);
     }
 
     [Fact]
     public async Task UserRepository_GetByEmployeeId_ShouldReturnMatch()
     {
         var repository = new UserRepositoryInMemory();
-        var user = User.CreateNew("Kaya Holmes", "kaya.holmes@agdata.com", "AGD-452");
-        repository.Add(user);
+        var user = CreateUser("Kaya Holmes", "kaya.holmes@agdata.com", "AGD-452");
+        repository.AddUser(user);
 
-        var retrieved = await repository.GetByEmployeeIdAsync(new EmployeeId("AGD-452"));
+        var retrieved = await repository.GetUserByEmployeeIdAsync(new EmployeeId("AGD-452"));
 
         Assert.Equal(user.Id, retrieved!.Id);
     }
@@ -50,23 +54,26 @@ public class InMemoryRepositoryTests
     public async Task EventRepository_ShouldUpdateEvent()
     {
         var repository = new EventRepositoryInMemory();
-        var rewardEvent = Event.CreateNew("AGDATA Greenlight Seminar", DateTimeOffset.UtcNow);
-        repository.Add(rewardEvent);
-        rewardEvent.UpdateEventName("AGDATA Mega Seminar");
-        repository.Update(rewardEvent);
+        var occursAt = DateTimeOffset.UtcNow;
+        var rewardEvent = Event.CreateNew("AGDATA Greenlight Seminar", occursAt);
+        repository.AddEvent(rewardEvent);
+        var updatedOccursAt = occursAt.AddDays(2);
+    rewardEvent.AdjustDetails("AGDATA Mega Seminar", updatedOccursAt);
+        repository.UpdateEvent(rewardEvent);
 
-        var retrieved = await repository.GetByIdAsync(rewardEvent.Id);
+        var retrieved = await repository.GetEventByIdAsync(rewardEvent.Id);
         Assert.Equal("AGDATA Mega Seminar", retrieved!.Name);
+        Assert.Equal(updatedOccursAt, retrieved.OccursAt);
     }
 
     [Fact]
     public async Task ProductRepository_GetAll_ShouldReturnEntries()
     {
         var repository = new ProductRepositoryInMemory();
-        repository.Add(Product.CreateNew("AGDATA Field Sticker", 50));
-        repository.Add(Product.CreateNew("AGDATA Badge", 75));
+        repository.AddProduct(Product.CreateNew("AGDATA Field Sticker", 50));
+        repository.AddProduct(Product.CreateNew("AGDATA Badge", 75));
 
-        var all = await repository.GetAllAsync();
+        var all = await repository.ListProductsAsync();
         Assert.Equal(2, all.Count());
     }
 
@@ -75,42 +82,60 @@ public class InMemoryRepositoryTests
     {
         var repository = new ProductRepositoryInMemory();
         var product = Product.CreateNew("AGDATA Soil Kit", 600);
-        repository.Add(product);
+        repository.AddProduct(product);
 
-        repository.Delete(product.Id);
+        repository.DeleteProduct(product.Id);
 
-        var retrieved = await repository.GetByIdAsync(product.Id);
+        var retrieved = await repository.GetProductByIdAsync(product.Id);
         Assert.Null(retrieved);
     }
 
     [Fact]
-    public async Task RedemptionRepository_ShouldDetectPending()
+    public async Task RedemptionRequestRepository_ShouldDetectPending()
     {
-        var repository = new RedemptionRepositoryInMemory();
-        var redemption = Redemption.CreateNew(Guid.NewGuid(), Guid.NewGuid());
-        repository.Add(redemption);
+        var repository = new RedemptionRequestRepositoryInMemory();
+        var redemption = RedemptionRequest.CreateNew(Guid.NewGuid(), Guid.NewGuid());
+        repository.AddRedemptionRequest(redemption);
 
-        var hasPending = await repository.HasPendingRedemptionForProductAsync(redemption.UserId, redemption.ProductId);
+        var hasPending = await repository.HasPendingRedemptionRequestForProductAsync(redemption.UserId, redemption.ProductId);
         Assert.True(hasPending);
 
         redemption.Approve();
-        repository.Update(redemption);
-        hasPending = await repository.HasPendingRedemptionForProductAsync(redemption.UserId, redemption.ProductId);
+        repository.UpdateRedemptionRequest(redemption);
+        hasPending = await repository.HasPendingRedemptionRequestForProductAsync(redemption.UserId, redemption.ProductId);
         Assert.False(hasPending);
     }
 
     [Fact]
-    public void PointsTransactionRepository_ShouldStoreTransactions()
+    public void LedgerEntryRepository_ShouldStoreEntries()
     {
-        var repository = new PointsTransactionRepositoryInMemory();
-        var transaction = new PointsTransaction(Guid.NewGuid(), Guid.NewGuid(), TransactionType.Earn, 10, DateTimeOffset.UtcNow, eventId: Guid.NewGuid());
+        var repository = new LedgerEntryRepositoryInMemory();
+        var entry = new LedgerEntry(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            LedgerEntryType.Earn,
+            10,
+            DateTimeOffset.UtcNow,
+            eventId: Guid.NewGuid());
 
-        repository.Add(transaction);
+        repository.AddLedgerEntry(entry);
 
         // No read API, so rely on ToString to ensure item exists by verifying it doesn't throw when enumerated indirectly via reflection.
-        var field = typeof(PointsTransactionRepositoryInMemory)
-            .GetField("_transactions", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        var list = (List<PointsTransaction>)field!.GetValue(repository)!;
+        var field = typeof(LedgerEntryRepositoryInMemory)
+            .GetField("_entries", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        var list = (List<LedgerEntry>)field!.GetValue(repository)!;
         Assert.Single(list);
+    }
+
+    private static User CreateUser(string fullName, string email, string employeeId)
+    {
+        var (first, middle, last) = NameTestHelper.Split(fullName);
+        return User.CreateNew(first, middle, last, email, employeeId);
+    }
+
+    private static PersonName CreatePersonName(string fullName)
+    {
+        var (first, middle, last) = NameTestHelper.Split(fullName);
+        return PersonName.Create(first, middle, last);
     }
 }
