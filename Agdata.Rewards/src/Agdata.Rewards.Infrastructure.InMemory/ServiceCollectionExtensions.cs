@@ -21,9 +21,10 @@ public static class ServiceCollectionExtensions
 
         services.AddSingleton<IUserRepository, UserRepositoryInMemory>();
         services.AddSingleton<IProductRepository, ProductRepositoryInMemory>();
-        services.AddSingleton<IRedemptionRepository, RedemptionRepositoryInMemory>();
+        services.AddSingleton<RedemptionRequestRepositoryInMemory>();
+        services.AddSingleton<IRedemptionRequestRepository>(sp => sp.GetRequiredService<RedemptionRequestRepositoryInMemory>());
         services.AddSingleton<IEventRepository, EventRepositoryInMemory>();
-        services.AddSingleton<IPointsTransactionRepository, PointsTransactionRepositoryInMemory>();
+        services.AddSingleton<ILedgerEntryRepository, LedgerEntryRepositoryInMemory>();
         services.AddSingleton<IUnitOfWork, InMemoryUnitOfWork>();
 
         services.AddSingleton<IAdminRegistry>(sp =>
@@ -35,10 +36,12 @@ public static class ServiceCollectionExtensions
         });
 
         services.AddScoped<IUserService, UserService>();
+        services.AddScoped<IUserProvisioningService, UserProvisioningService>();
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IEventService, EventService>();
         services.AddScoped<IPointsLedgerService, PointsLedgerService>();
         services.AddScoped<IProductCatalogService, ProductCatalogService>();
-        services.AddScoped<IRedemptionService, RedemptionService>();
+        services.AddScoped<IRedemptionRequestService, RedemptionRequestService>();
 
         return services;
     }

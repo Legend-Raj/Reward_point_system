@@ -2,122 +2,107 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Agdata.Rewards.Application.DTOs.Common;
 using Agdata.Rewards.Application.Interfaces;
 using Agdata.Rewards.Application.Interfaces.Repositories;
 using Agdata.Rewards.Application.Interfaces.Services;
 using Agdata.Rewards.Domain.Entities;
 using Agdata.Rewards.Domain.Enums;
 using Agdata.Rewards.Domain.Exceptions;
+using Agdata.Rewards.Application.Services.Shared;
 
 namespace Agdata.Rewards.Application.Services;
 
 public class PointsLedgerService : IPointsLedgerService
 {
+    private const int MaxPageSize = 100;
+
     private readonly IUserRepository _userRepository;
     private readonly IEventRepository _eventRepository;
-    private readonly IPointsTransactionRepository _pointsTransactionRepository;
+    private readonly ILedgerEntryRepository _ledgerEntryRepository;
     private readonly IUnitOfWork _unitOfWork;
 
     public PointsLedgerService(
         IUserRepository userRepository,
-        IEventRepository eventRepository,
-        IPointsTransactionRepository pointsTransactionRepository,
+    IEventRepository eventRepository,
+    ILedgerEntryRepository ledgerEntryRepository,
         IUnitOfWork unitOfWork)
     {
         _userRepository = userRepository;
         _eventRepository = eventRepository;
-        _pointsTransactionRepository = pointsTransactionRepository;
+        _ledgerEntryRepository = ledgerEntryRepository;
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<PointsTransaction> EarnAsync(Guid userId, Guid eventId, int points)
+    public async Task<LedgerEntry> EarnAsync(Admin actor, Guid userId, Guid eventId, int points)
     {
+    AdminGuard.EnsureActive(actor);
+
         if (points <= 0)
         {
-            throw new DomainException("Points must be a positive amount.");
+            throw new DomainException(DomainErrors.Points.MustBePositive);
         }
 
-        var userAccount = await _userRepository.GetByIdAsync(userId)
-            ?? throw new DomainException("Cannot allocate points to a non-existent user.");
+        var userAccount = await _userRepository.GetUserByIdAsync(userId)
+            ?? throw new DomainException(DomainErrors.Repository.NonExistentUser);
 
-        var rewardEvent = await _eventRepository.GetByIdAsync(eventId)
-            ?? throw new DomainException("Cannot allocate points for a non-existent event.");
+        var rewardEvent = await _eventRepository.GetEventByIdAsync(eventId)
+            ?? throw new DomainException(DomainErrors.Repository.NonExistentEvent);
 
         if (!userAccount.IsActive)
         {
-            throw new DomainException("Points cannot be allocated to an inactive user account.");
+            throw new DomainException(DomainErrors.User.AllocationBlockedInactiveAccount);
         }
 
         if (!rewardEvent.IsActive)
         {
-            throw new DomainException("Points cannot be allocated for an inactive event.");
+            throw new DomainException(DomainErrors.Event.Inactive);
         }
 
-        userAccount.AddPoints(points);
+        userAccount.CreditPoints(points);
 
-        var pointsTransaction = new PointsTransaction(
+        var ledgerEntry = new LedgerEntry(
             Guid.NewGuid(),
             userAccount.Id,
-            TransactionType.Earn,
+            LedgerEntryType.Earn,
             points,
             DateTimeOffset.UtcNow,
             eventId: rewardEvent.Id
         );
-        _pointsTransactionRepository.Add(pointsTransaction);
+        _ledgerEntryRepository.AddLedgerEntry(ledgerEntry);
 
-        _userRepository.Update(userAccount);
+        _userRepository.UpdateUser(userAccount);
 
         await _unitOfWork.SaveChangesAsync();
 
-        return pointsTransaction;
+        return ledgerEntry;
     }
 
-    public async Task<IReadOnlyList<PointsTransaction>> GetUserTransactionHistoryAsync(Guid userId)
+    public async Task<PagedResult<LedgerEntry>> GetUserTransactionHistoryAsync(Guid userId, int skip, int take)
     {
-        var user = await _userRepository.GetByIdAsync(userId)
-            ?? throw new DomainException("Cannot fetch history for a non-existent user.");
-
-        return await _pointsTransactionRepository.GetByUserIdAsync(user.Id);
-    }
-
-    public async Task<Event> CreateEventAsync(string name, bool isActive = true)
-    {
-        var newEvent = Event.CreateNew(name, DateTimeOffset.UtcNow);
-
-        if (!isActive)
+        if (skip < 0)
         {
-            newEvent.MakeInactive();
+            throw new DomainException(DomainErrors.Validation.SkipMustBeNonNegative);
         }
 
-        _eventRepository.Add(newEvent);
-        await _unitOfWork.SaveChangesAsync();
-        return newEvent;
-    }
-
-    public async Task<IReadOnlyList<Event>> ListEventsAsync(bool onlyActive = true)
-    {
-        var events = await _eventRepository.GetAllAsync();
-        var filtered = onlyActive ? events.Where(ev => ev.IsActive) : events;
-        return filtered.ToList();
-    }
-
-    public async Task<Event> SetEventActiveAsync(Guid eventId, bool isActive)
-    {
-        var rewardEvent = await _eventRepository.GetByIdAsync(eventId)
-            ?? throw new DomainException("Event not found.");
-
-        if (isActive)
+        if (take <= 0)
         {
-            rewardEvent.MakeActive();
-        }
-        else
-        {
-            rewardEvent.MakeInactive();
+            throw new DomainException(DomainErrors.Validation.TakeMustBePositive);
         }
 
-        _eventRepository.Update(rewardEvent);
-        await _unitOfWork.SaveChangesAsync();
+        if (take > MaxPageSize)
+        {
+            throw new DomainException(DomainErrors.Validation.TakeExceedsMaximum);
+        }
 
-        return rewardEvent;
+        var user = await _userRepository.GetUserByIdAsync(userId)
+            ?? throw new DomainException(DomainErrors.History.UserMissing);
+
+        var history = await _ledgerEntryRepository.ListLedgerEntriesByUserAsync(user.Id);
+        var ordered = history.OrderByDescending(tx => tx.Timestamp).ToList();
+        var page = ordered.Skip(skip).Take(take).ToList();
+
+        return new PagedResult<LedgerEntry>(page, ordered.Count, skip, take);
     }
+
 }

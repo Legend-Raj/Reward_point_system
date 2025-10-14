@@ -1,6 +1,6 @@
 namespace Agdata.Rewards.Domain.Enums;
 
-public enum RedemptionStatus
+public enum RedemptionRequestStatus
 {
     Pending,
     Approved,

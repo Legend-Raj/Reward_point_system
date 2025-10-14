@@ -5,14 +5,14 @@ using Xunit;
 
 namespace Agdata.Rewards.Tests.Domain;
 
-public class RedemptionTests
+public class RedemptionRequestTests
 {
     [Fact]
     public void CreateNew_ShouldStartAsPending()
     {
-        var redemption = Redemption.CreateNew(Guid.NewGuid(), Guid.NewGuid());
+        var redemption = RedemptionRequest.CreateNew(Guid.NewGuid(), Guid.NewGuid());
 
-        Assert.Equal(RedemptionStatus.Pending, redemption.Status);
+        Assert.Equal(RedemptionRequestStatus.Pending, redemption.Status);
         Assert.NotEqual(default, redemption.RequestedAt);
         Assert.Null(redemption.ApprovedAt);
         Assert.Null(redemption.DeliveredAt);
@@ -21,12 +21,12 @@ public class RedemptionTests
     [Fact]
     public void ApproveAndDeliver_ShouldFollowHappyPath()
     {
-        var redemption = Redemption.CreateNew(Guid.NewGuid(), Guid.NewGuid());
+        var redemption = RedemptionRequest.CreateNew(Guid.NewGuid(), Guid.NewGuid());
 
         redemption.Approve();
         redemption.Deliver();
 
-        Assert.Equal(RedemptionStatus.Delivered, redemption.Status);
+        Assert.Equal(RedemptionRequestStatus.Delivered, redemption.Status);
         Assert.NotNull(redemption.ApprovedAt);
         Assert.NotNull(redemption.DeliveredAt);
     }
@@ -34,7 +34,7 @@ public class RedemptionTests
     [Fact]
     public void Approve_WhenNotPending_ShouldThrow()
     {
-        var redemption = Redemption.CreateNew(Guid.NewGuid(), Guid.NewGuid());
+        var redemption = RedemptionRequest.CreateNew(Guid.NewGuid(), Guid.NewGuid());
         redemption.Approve();
 
         Assert.Throws<DomainException>(() => redemption.Approve());
@@ -43,7 +43,7 @@ public class RedemptionTests
     [Fact]
     public void Deliver_WhenNotApproved_ShouldThrow()
     {
-        var redemption = Redemption.CreateNew(Guid.NewGuid(), Guid.NewGuid());
+        var redemption = RedemptionRequest.CreateNew(Guid.NewGuid(), Guid.NewGuid());
 
         Assert.Throws<DomainException>(() => redemption.Deliver());
     }
@@ -51,13 +51,13 @@ public class RedemptionTests
     [Fact]
     public void RejectAndCancel_ShouldOnlyWorkFromPending()
     {
-        var redemption = Redemption.CreateNew(Guid.NewGuid(), Guid.NewGuid());
+        var redemption = RedemptionRequest.CreateNew(Guid.NewGuid(), Guid.NewGuid());
         redemption.Reject();
-        Assert.Equal(RedemptionStatus.Rejected, redemption.Status);
+        Assert.Equal(RedemptionRequestStatus.Rejected, redemption.Status);
 
-        var redemption2 = Redemption.CreateNew(Guid.NewGuid(), Guid.NewGuid());
+        var redemption2 = RedemptionRequest.CreateNew(Guid.NewGuid(), Guid.NewGuid());
         redemption2.Cancel();
-        Assert.Equal(RedemptionStatus.Canceled, redemption2.Status);
+        Assert.Equal(RedemptionRequestStatus.Canceled, redemption2.Status);
 
         Assert.Throws<DomainException>(() => redemption.Reject());
         Assert.Throws<DomainException>(() => redemption2.Cancel());
@@ -66,14 +66,14 @@ public class RedemptionTests
     [Fact]
     public void CreateNew_WithInvalidIdentifiers_ShouldThrow()
     {
-        Assert.Throws<DomainException>(() => Redemption.CreateNew(Guid.Empty, Guid.NewGuid()));
-        Assert.Throws<DomainException>(() => Redemption.CreateNew(Guid.NewGuid(), Guid.Empty));
+        Assert.Throws<DomainException>(() => RedemptionRequest.CreateNew(Guid.Empty, Guid.NewGuid()));
+        Assert.Throws<DomainException>(() => RedemptionRequest.CreateNew(Guid.NewGuid(), Guid.Empty));
     }
 
     [Fact]
     public void Cancel_AfterApproval_ShouldThrow()
     {
-        var redemption = Redemption.CreateNew(Guid.NewGuid(), Guid.NewGuid());
+        var redemption = RedemptionRequest.CreateNew(Guid.NewGuid(), Guid.NewGuid());
         redemption.Approve();
 
         Assert.Throws<DomainException>(() => redemption.Cancel());
@@ -82,10 +82,10 @@ public class RedemptionTests
     [Fact]
     public void Deliver_AfterCancellationOrRejection_ShouldThrow()
     {
-        var canceled = Redemption.CreateNew(Guid.NewGuid(), Guid.NewGuid());
+        var canceled = RedemptionRequest.CreateNew(Guid.NewGuid(), Guid.NewGuid());
         canceled.Cancel();
 
-        var rejected = Redemption.CreateNew(Guid.NewGuid(), Guid.NewGuid());
+        var rejected = RedemptionRequest.CreateNew(Guid.NewGuid(), Guid.NewGuid());
         rejected.Reject();
 
         Assert.Throws<DomainException>(() => canceled.Deliver());
@@ -95,7 +95,7 @@ public class RedemptionTests
     [Fact]
     public void Approve_ShouldStampApprovedAtOnce()
     {
-        var redemption = Redemption.CreateNew(Guid.NewGuid(), Guid.NewGuid());
+        var redemption = RedemptionRequest.CreateNew(Guid.NewGuid(), Guid.NewGuid());
 
         redemption.Approve();
 

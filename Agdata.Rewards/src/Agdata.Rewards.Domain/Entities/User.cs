@@ -1,3 +1,4 @@
+using System;
 using Agdata.Rewards.Domain.Exceptions;
 using Agdata.Rewards.Domain.ValueObjects;
 
@@ -8,130 +9,196 @@ public class User
     public Guid Id { get; }
     public Email Email { get; private set; }
     public EmployeeId EmployeeId { get; private set; }
-    public string Name { get; private set; }
+    public PersonName Name { get; private set; }
     public bool IsActive { get; private set; }
+
+    public DateTimeOffset CreatedAt { get; }
+    public DateTimeOffset UpdatedAt { get; private set; }
 
     public int TotalPoints { get; private set; }
     public int LockedPoints { get; private set; }
     public int AvailablePoints => TotalPoints - LockedPoints;
 
-    public User(Guid id, string name, Email email, EmployeeId employeeId, bool isActive = true, int totalPoints = 0, int lockedPoints = 0)
+    public User(
+        Guid userId,
+        PersonName name,
+        Email email,
+        EmployeeId employeeId,
+        bool isActive = true,
+        int totalPoints = 0,
+        int lockedPoints = 0,
+        DateTimeOffset? createdAt = null,
+        DateTimeOffset? updatedAt = null)
     {
-        if (id == Guid.Empty)
+        if (userId == Guid.Empty)
         {
-            throw new DomainException("User Id cannot be empty.");
-        }
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            throw new DomainException("Name is required.");
+            throw new DomainException(DomainErrors.User.IdRequired);
         }
         if (totalPoints < 0 || lockedPoints < 0 || totalPoints < lockedPoints)
         {
-            throw new DomainException("Invalid points state. Total points cannot be less than locked points.");
+            throw new DomainException(DomainErrors.User.InvalidPointsState);
         }
 
-        Id = id;
-        Name = name.Trim();
-        Email = email ?? throw new DomainException("Email is required.");
-        EmployeeId = employeeId ?? throw new DomainException("EmployeeId is required.");
+    Id = userId;
+    Name = name ?? throw new DomainException(DomainErrors.User.NameRequired);
+    Email = RequireEmail(email);
+    EmployeeId = RequireEmployeeId(employeeId);
         IsActive = isActive;
         TotalPoints = totalPoints;
         LockedPoints = lockedPoints;
+
+        var effectiveCreatedAt = createdAt ?? DateTimeOffset.UtcNow;
+        if (effectiveCreatedAt == default)
+        {
+            effectiveCreatedAt = DateTimeOffset.UtcNow;
+        }
+
+        var effectiveUpdatedAt = updatedAt ?? effectiveCreatedAt;
+        if (effectiveUpdatedAt == default)
+        {
+            effectiveUpdatedAt = effectiveCreatedAt;
+        }
+
+        if (effectiveUpdatedAt < effectiveCreatedAt)
+        {
+            throw new DomainException(DomainErrors.User.UpdatedBeforeCreated);
+        }
+
+        CreatedAt = effectiveCreatedAt;
+        UpdatedAt = effectiveUpdatedAt;
     }
 
-    public static User CreateNew(string name, string email, string employeeId)
+    public static User CreateNew(string firstName, string? middleName, string lastName, string email, string employeeId)
     {
-        return new User(Guid.NewGuid(), name, new Email(email), new EmployeeId(employeeId));
+        var now = DateTimeOffset.UtcNow;
+        return new User(
+            Guid.NewGuid(),
+            PersonName.Create(firstName, middleName, lastName),
+            new Email(email),
+            new EmployeeId(employeeId),
+            createdAt: now,
+            updatedAt: now);
     }
 
-    public void ActivateAccount()
+    public void Activate()
     {
+        if (IsActive)
+        {
+            return;
+        }
+
         IsActive = true;
+        Touch();
     }
 
-    public void DeactivateAccount()
+    public void Deactivate()
     {
+        if (!IsActive)
+        {
+            return;
+        }
+
         IsActive = false;
+        Touch();
     }
 
-    public void UpdateEmail(Email newEmail)
+    public void ChangeEmail(Email newEmail)
     {
-        Email = newEmail ?? throw new DomainException("Email is required.");
+        Email = RequireEmail(newEmail);
+        Touch();
     }
 
-    public void UpdateEmployeeId(EmployeeId newEmployeeId)
+    public void ChangeEmployeeId(EmployeeId newEmployeeId)
     {
-        EmployeeId = newEmployeeId ?? throw new DomainException("EmployeeId is required.");
+        EmployeeId = RequireEmployeeId(newEmployeeId);
+        Touch();
     }
 
-    public void AddPoints(int points)
+    public void CreditPoints(int points)
     {
         if (points <= 0)
         {
-            throw new DomainException("Credit points must be a positive number.");
+            throw new DomainException(DomainErrors.User.CreditAmountMustBePositive);
         }
 
         checked
         {
             TotalPoints += points;
         }
+
+        Touch();
     }
 
-    public void LockPoints(int pointsToLock)
+    public void ReservePoints(int pointsToLock)
     {
         if (pointsToLock <= 0)
         {
-            throw new DomainException("Points to lock must be positive.");
+            throw new DomainException(DomainErrors.User.ReserveAmountMustBePositive);
         }
         if (AvailablePoints < pointsToLock)
         {
-            throw new DomainException("Insufficient available points to lock.");
+            throw new DomainException(DomainErrors.User.InsufficientPointsToReserve);
         }
 
         LockedPoints += pointsToLock;
+        Touch();
     }
 
-    public void UnlockPoints(int pointsToUnlock)
+    public void ReleaseReservedPoints(int pointsToUnlock)
     {
         if (pointsToUnlock <= 0)
         {
-            throw new DomainException("Points to unlock must be positive.");
+            throw new DomainException(DomainErrors.User.ReleaseAmountMustBePositive);
         }
         if (LockedPoints < pointsToUnlock)
         {
-            throw new DomainException("Cannot unlock more points than are locked.");
+            throw new DomainException(DomainErrors.User.ReleaseExceedsReserved);
         }
 
         LockedPoints -= pointsToUnlock;
+        Touch();
     }
 
-    public void CommitLockedPoints(int pointsToCommit)
+    public void CaptureReservedPoints(int pointsToCommit)
     {
         if (pointsToCommit <= 0)
         {
-            throw new DomainException("Points to commit must be positive.");
+            throw new DomainException(DomainErrors.User.CaptureAmountMustBePositive);
         }
         if (LockedPoints < pointsToCommit)
         {
-            throw new DomainException("Cannot commit more points than are locked.");
+            throw new DomainException(DomainErrors.User.CaptureExceedsReserved);
         }
 
         TotalPoints -= pointsToCommit;
         LockedPoints -= pointsToCommit;
+        Touch();
     }
 
-    public void UpdateName(string newName)
+    public void Rename(PersonName newName)
     {
-        if (string.IsNullOrWhiteSpace(newName))
-        {
-            throw new DomainException("Name cannot be empty.");
-        }
-
-        Name = newName.Trim();
+        Name = newName ?? throw new DomainException(DomainErrors.User.NameRequired);
+        Touch();
     }
 
     public override string ToString()
     {
-        return $"{Name} ({Email}) [{EmployeeId}] - Total: {TotalPoints}, Available: {AvailablePoints}, Active: {IsActive}";
+        return $"{Name.FullName} ({Email}) [{EmployeeId}] - Total: {TotalPoints}, Available: {AvailablePoints}, Active: {IsActive}";
+    }
+
+    private void Touch()
+    {
+        var now = DateTimeOffset.UtcNow;
+        UpdatedAt = now > UpdatedAt ? now : UpdatedAt.AddTicks(1);
+    }
+
+    private static Email RequireEmail(Email? email)
+    {
+        return email ?? throw new DomainException(DomainErrors.EmailRequired);
+    }
+
+    private static EmployeeId RequireEmployeeId(EmployeeId? employeeId)
+    {
+        return employeeId ?? throw new DomainException(DomainErrors.EmployeeIdRequired);
     }
 }

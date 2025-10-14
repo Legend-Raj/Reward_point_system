@@ -21,17 +21,17 @@ public class InMemoryAdminRegistry : IAdminRegistry
         return _adminIdentifiers.Contains(email) || _adminIdentifiers.Contains(employeeId);
     }
 
-    public void AddAdmin(string emailOrEmployeeId)
+    public void AddAdminIdentifier(string adminIdentifier)
     {
-        _adminIdentifiers.Add(emailOrEmployeeId);
+        _adminIdentifiers.Add(adminIdentifier);
     }
 
-    public void RemoveAdmin(string emailOrEmployeeId)
+    public void RemoveAdminIdentifier(string adminIdentifier)
     {
         if (_adminIdentifiers.Count <= 1)
         {
-            throw new DomainException("Cannot remove the last admin from the system.");
+            throw new DomainException(DomainErrors.Admin.CannotRemoveLast);
         }
-        _adminIdentifiers.Remove(emailOrEmployeeId);
+        _adminIdentifiers.Remove(adminIdentifier);
     }
 }

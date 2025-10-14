@@ -1,5 +1,9 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
+using Agdata.Rewards.Application.DTOs.Common;
+using Agdata.Rewards.Application.DTOs.Users;
 using Agdata.Rewards.Application.Interfaces;
 using Agdata.Rewards.Application.Interfaces.Repositories;
 using Agdata.Rewards.Application.Interfaces.Services;
@@ -11,6 +15,8 @@ namespace Agdata.Rewards.Application.Services;
 
 public class UserService : IUserService
 {
+    private const int MaxPageSize = 100;
+
     private readonly IUserRepository _userRepository;
     private readonly IUnitOfWork _unitOfWork;
 
@@ -20,95 +26,192 @@ public class UserService : IUserService
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<User> CreateNewUserAsync(string name, string email, string employeeId)
+    public async Task<User> CreateNewUserAsync(string firstName, string? middleName, string lastName, string email, string employeeId)
     {
         var emailAddress = new Email(email);
         var employeeIdentifier = new EmployeeId(employeeId);
 
-        if (await _userRepository.GetByEmailAsync(emailAddress) is not null)
+        if (await _userRepository.GetUserByEmailAsync(emailAddress) is not null)
         {
-            throw new DomainException("A user with this email already exists.");
+            throw new DomainException(DomainErrors.User.EmailExists);
         }
 
-        if (await _userRepository.GetByEmployeeIdAsync(employeeIdentifier) is not null)
+        if (await _userRepository.GetUserByEmployeeIdAsync(employeeIdentifier) is not null)
         {
-            throw new DomainException("A user with this employee ID already exists.");
+            throw new DomainException(DomainErrors.User.EmployeeIdExists);
         }
 
-        var newUser = User.CreateNew(name, email, employeeId);
+        var newUser = User.CreateNew(firstName, middleName, lastName, email, employeeId);
 
-        _userRepository.Add(newUser);
+        _userRepository.AddUser(newUser);
         await _unitOfWork.SaveChangesAsync();
 
         return newUser;
     }
 
-    public Task<User?> GetByIdAsync(Guid id)
+    public Task<User?> GetUserByIdAsync(Guid userId)
     {
-        return _userRepository.GetByIdAsync(id);
+        return _userRepository.GetUserByIdAsync(userId);
     }
 
     public Task<User?> GetByEmailAsync(string email)
     {
         var emailAddress = new Email(email);
-        return _userRepository.GetByEmailAsync(emailAddress);
+        return _userRepository.GetUserByEmailAsync(emailAddress);
     }
 
     public Task<User?> GetByEmployeeIdAsync(string employeeId)
     {
         var employeeIdentifier = new EmployeeId(employeeId);
-        return _userRepository.GetByEmployeeIdAsync(employeeIdentifier);
+        return _userRepository.GetUserByEmployeeIdAsync(employeeIdentifier);
     }
 
-    public async Task<User> UpdateUserAsync(Guid id, string? name, string? email, string? employeeId, bool? isActive)
+    public Task<IReadOnlyList<User>> ListUsersAsync()
     {
-        var user = await _userRepository.GetByIdAsync(id)
-            ?? throw new DomainException("User not found.");
+        return _userRepository.ListUsersAsync();
+    }
 
-        if (!string.IsNullOrWhiteSpace(name))
+    public async Task<User> UpdateUserAsync(Guid userId, string? firstName, string? middleName, string? lastName, string? email, string? employeeId, bool? isActive)
+    {
+        var user = await _userRepository.GetUserByIdAsync(userId)
+            ?? throw new DomainException(DomainErrors.User.NotFound);
+
+        if (firstName is not null || middleName is not null || lastName is not null)
         {
-            user.UpdateName(name);
+            var updatedFirst = firstName ?? user.Name.FirstName;
+            var updatedMiddle = middleName ?? user.Name.MiddleName;
+            var updatedLast = lastName ?? user.Name.LastName;
+
+            user.Rename(PersonName.Create(updatedFirst, updatedMiddle, updatedLast));
         }
 
         if (!string.IsNullOrWhiteSpace(email))
         {
             var desiredEmail = new Email(email);
-            var existing = await _userRepository.GetByEmailAsync(desiredEmail);
+            var existing = await _userRepository.GetUserByEmailAsync(desiredEmail);
             if (existing is not null && existing.Id != user.Id)
             {
-                throw new DomainException("A user with this email already exists.");
+                throw new DomainException(DomainErrors.User.EmailExists);
             }
 
-            user.UpdateEmail(desiredEmail);
+            user.ChangeEmail(desiredEmail);
         }
 
         if (!string.IsNullOrWhiteSpace(employeeId))
         {
             var desiredEmployeeId = new EmployeeId(employeeId);
-            var existingEmployee = await _userRepository.GetByEmployeeIdAsync(desiredEmployeeId);
+            var existingEmployee = await _userRepository.GetUserByEmployeeIdAsync(desiredEmployeeId);
             if (existingEmployee is not null && existingEmployee.Id != user.Id)
             {
-                throw new DomainException("A user with this employee ID already exists.");
+                throw new DomainException(DomainErrors.User.EmployeeIdExists);
             }
 
-            user.UpdateEmployeeId(desiredEmployeeId);
+            user.ChangeEmployeeId(desiredEmployeeId);
         }
 
         if (isActive.HasValue)
         {
             if (isActive.Value)
             {
-                user.ActivateAccount();
+                user.Activate();
             }
             else
             {
-                user.DeactivateAccount();
+                user.Deactivate();
             }
         }
 
-        _userRepository.Update(user);
+        _userRepository.UpdateUser(user);
         await _unitOfWork.SaveChangesAsync();
 
         return user;
+    }
+
+    public async Task<User> ActivateUserAsync(Guid userId)
+    {
+        var user = await _userRepository.GetUserByIdAsync(userId)
+            ?? throw new DomainException(DomainErrors.User.NotFound);
+
+        if (!user.IsActive)
+        {
+            user.Activate();
+            _userRepository.UpdateUser(user);
+            await _unitOfWork.SaveChangesAsync();
+        }
+
+        return user;
+    }
+
+    public async Task<User> DeactivateUserAsync(Guid userId)
+    {
+        var user = await _userRepository.GetUserByIdAsync(userId)
+            ?? throw new DomainException(DomainErrors.User.NotFound);
+
+        if (user.IsActive)
+        {
+            user.Deactivate();
+            _userRepository.UpdateUser(user);
+            await _unitOfWork.SaveChangesAsync();
+        }
+
+        return user;
+    }
+
+    public async Task<PagedResult<User>> QueryUsersAsync(UserQueryOptions queryOptions)
+    {
+        if (queryOptions is null)
+        {
+            throw new ArgumentNullException(nameof(queryOptions));
+        }
+
+        if (queryOptions.Skip < 0)
+        {
+            throw new DomainException(DomainErrors.Validation.SkipMustBeNonNegative);
+        }
+
+        if (queryOptions.Take <= 0)
+        {
+            throw new DomainException(DomainErrors.Validation.TakeMustBePositive);
+        }
+
+        if (queryOptions.Take > MaxPageSize)
+        {
+            throw new DomainException(DomainErrors.Validation.TakeExceedsMaximum);
+        }
+
+        var users = await _userRepository.ListUsersAsync();
+
+        var filtered = users.AsEnumerable();
+
+        if (queryOptions.IsActive.HasValue)
+        {
+            filtered = filtered.Where(user => user.IsActive == queryOptions.IsActive.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(queryOptions.Search))
+        {
+            var term = queryOptions.Search.Trim();
+            filtered = filtered.Where(user => MatchesSearch(user, term));
+        }
+
+        var ordered = filtered
+            .OrderBy(user => user.Name.LastName)
+            .ThenBy(user => user.Name.FirstName)
+            .ThenBy(user => user.Email.Value)
+            .ToList();
+
+        var pageItems = ordered
+            .Skip(queryOptions.Skip)
+            .Take(queryOptions.Take)
+            .ToList();
+
+        return new PagedResult<User>(pageItems, ordered.Count, queryOptions.Skip, queryOptions.Take);
+    }
+
+    private static bool MatchesSearch(User user, string term)
+    {
+        return user.Name.FullName.Contains(term, StringComparison.OrdinalIgnoreCase)
+            || user.Email.Value.Contains(term, StringComparison.OrdinalIgnoreCase)
+            || user.EmployeeId.Value.Contains(term, StringComparison.OrdinalIgnoreCase);
     }
 }

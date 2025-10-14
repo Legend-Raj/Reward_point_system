@@ -6,38 +6,34 @@ public sealed class Event
 {
     public Guid Id { get; }
     public string Name { get; private set; }
-    public DateTimeOffset OccurredAt { get; private set; }
+    public DateTimeOffset OccursAt { get; private set; }
     public bool IsActive { get; private set; }
 
-    public Event(Guid id, string name, DateTimeOffset occurredAt, bool isActive = true)
+    public Event(Guid eventId, string name, DateTimeOffset occursAt, bool isActive = true)
     {
-        if (id == Guid.Empty)
+        if (eventId == Guid.Empty)
         {
-            throw new DomainException("Event Id cannot be empty.");
+            throw new DomainException(DomainErrors.Event.IdRequired);
         }
 
         ValidateEventName(name);
 
-        Id = id;
+    Id = eventId;
         Name = name.Trim();
-        OccurredAt = occurredAt;
+        OccursAt = occursAt;
         IsActive = isActive;
     }
 
-    public static Event CreateNew(string name, DateTimeOffset occurredAt)
+    public static Event CreateNew(string name, DateTimeOffset occursAt)
     {
-        return new Event(Guid.NewGuid(), name, occurredAt);
+        return new Event(Guid.NewGuid(), name, occursAt);
     }
 
-    public void UpdateEventName(string name)
+    public void AdjustDetails(string name, DateTimeOffset occursAt)
     {
         ValidateEventName(name);
         Name = name.Trim();
-    }
-
-    public void ChangeEventDateTime(DateTimeOffset newWhen)
-    {
-        OccurredAt = newWhen;
+        OccursAt = occursAt;
     }
 
     public void MakeActive()
@@ -54,12 +50,12 @@ public sealed class Event
     {
         if (string.IsNullOrWhiteSpace(name))
         {
-            throw new DomainException("Event name is required.");
+            throw new DomainException(DomainErrors.Event.NameRequired);
         }
     }
 
     public override string ToString()
     {
-        return $"{Name} @ {OccurredAt:yyyy-MM-dd HH:mm} (Active: {IsActive})";
+        return $"{Name} @ {OccursAt:yyyy-MM-dd HH:mm} (Active: {IsActive})";
     }
 }

@@ -19,16 +19,16 @@ public class InMemoryAdminRegistryTests
     {
         var registry = new InMemoryAdminRegistry(new[] { "ops.admin@agdata.com" });
 
-        Assert.True(registry.IsAdmin("OPS.ADMIN@AGDATA.COM", "AGD-ADMIN-500"));
-        Assert.False(registry.IsAdmin("guest@agdata.com", "AGD-ADMIN-500"));
+    Assert.True(registry.IsAdmin("OPS.ADMIN@AGDATA.COM", "AGD-500"));
+    Assert.False(registry.IsAdmin("guest@agdata.com", "AGD-500"));
     }
 
     [Fact]
     public void IsAdmin_ShouldMatchByEmployeeId()
     {
-        var registry = new InMemoryAdminRegistry(new[] { "AGD-ADMIN-510" });
+    var registry = new InMemoryAdminRegistry(new[] { "AGD-510" });
 
-        Assert.True(registry.IsAdmin("anyone@agdata.com", "AGD-ADMIN-510"));
+    Assert.True(registry.IsAdmin("anyone@agdata.com", "AGD-510"));
     }
 
     [Fact]
@@ -36,20 +36,20 @@ public class InMemoryAdminRegistryTests
     {
         var registry = new InMemoryAdminRegistry(new[] { "catalog.admin@agdata.com" });
 
-        registry.AddAdmin("AGD-ADMIN-520");
+    registry.AddAdminIdentifier("AGD-520");
 
-        Assert.True(registry.IsAdmin("anyone@agdata.com", "AGD-ADMIN-520"));
+    Assert.True(registry.IsAdmin("anyone@agdata.com", "AGD-520"));
     }
 
     [Fact]
     public void RemoveAdmin_WhenMoreThanOne_ShouldSucceed()
     {
-        var registry = new InMemoryAdminRegistry(new[] { "support.admin@agdata.com", "AGD-ADMIN-530" });
+    var registry = new InMemoryAdminRegistry(new[] { "support.admin@agdata.com", "AGD-530" });
 
-        registry.RemoveAdmin("support.admin@agdata.com");
+    registry.RemoveAdminIdentifier("support.admin@agdata.com");
 
-        Assert.False(registry.IsAdmin("support.admin@agdata.com", "AGD-ADMIN-999"));
-        Assert.True(registry.IsAdmin("anyone@agdata.com", "AGD-ADMIN-530"));
+    Assert.False(registry.IsAdmin("support.admin@agdata.com", "AGD-999"));
+    Assert.True(registry.IsAdmin("anyone@agdata.com", "AGD-530"));
     }
 
     [Fact]
@@ -57,6 +57,6 @@ public class InMemoryAdminRegistryTests
     {
         var registry = new InMemoryAdminRegistry(new[] { "solo.admin@agdata.com" });
 
-        Assert.Throws<DomainException>(() => registry.RemoveAdmin("solo.admin@agdata.com"));
+    Assert.Throws<DomainException>(() => registry.RemoveAdminIdentifier("solo.admin@agdata.com"));
     }
 }

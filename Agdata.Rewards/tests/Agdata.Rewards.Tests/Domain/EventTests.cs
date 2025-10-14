@@ -13,7 +13,7 @@ public class EventTests
         var rewardEvent = Event.CreateNew("Hackathon Finals", when);
 
         Assert.Equal("Hackathon Finals", rewardEvent.Name);
-        Assert.Equal(when, rewardEvent.OccurredAt);
+    Assert.Equal(when, rewardEvent.OccursAt);
         Assert.True(rewardEvent.IsActive);
     }
 
@@ -28,14 +28,18 @@ public class EventTests
     }
 
     [Fact]
-    public void UpdateEventName_ShouldValidateInput()
+    public void AdjustDetails_ShouldValidateName_AndPersistChanges()
     {
-        var rewardEvent = Event.CreateNew("Old", DateTimeOffset.UtcNow);
+        var originalWhen = DateTimeOffset.UtcNow;
+        var rewardEvent = Event.CreateNew("Old", originalWhen);
 
-        rewardEvent.UpdateEventName("New Title");
+        var newWhen = originalWhen.AddDays(7);
+    rewardEvent.AdjustDetails("New Title", newWhen);
+
         Assert.Equal("New Title", rewardEvent.Name);
+        Assert.Equal(newWhen, rewardEvent.OccursAt);
 
-        Assert.Throws<DomainException>(() => rewardEvent.UpdateEventName(" "));
+    Assert.Throws<DomainException>(() => rewardEvent.AdjustDetails(" ", newWhen));
     }
 
     [Fact]
@@ -47,28 +51,20 @@ public class EventTests
     [Fact]
     public void Ctor_WithEmptyId_ShouldThrow()
     {
-        Assert.Throws<DomainException>(() => new Event(Guid.Empty, "Dealer Workshop", DateTimeOffset.UtcNow));
+    Assert.Throws<DomainException>(() => new Event(Guid.Empty, "Dealer Workshop", DateTimeOffset.UtcNow));
     }
 
     [Fact]
-    public void UpdateEventName_ShouldTrimInput()
+    public void AdjustDetails_ShouldTrimName()
     {
-        var rewardEvent = Event.CreateNew("Quarterly Brief", DateTimeOffset.UtcNow);
+        var originalWhen = DateTimeOffset.UtcNow;
+        var rewardEvent = Event.CreateNew("Quarterly Brief", originalWhen);
 
-        rewardEvent.UpdateEventName("  AGDATA Roadshow  ");
+        var updatedWhen = originalWhen.AddHours(3);
+    rewardEvent.AdjustDetails("  AGDATA Roadshow  ", updatedWhen);
 
         Assert.Equal("AGDATA Roadshow", rewardEvent.Name);
-    }
-
-    [Fact]
-    public void ChangeEventDateTime_ShouldPersistNewTimestamp()
-    {
-        var rewardEvent = Event.CreateNew("Dealer Summit", DateTimeOffset.UtcNow);
-        var newSchedule = DateTimeOffset.UtcNow.AddMonths(1);
-
-        rewardEvent.ChangeEventDateTime(newSchedule);
-
-        Assert.Equal(newSchedule, rewardEvent.OccurredAt);
+        Assert.Equal(updatedWhen, rewardEvent.OccursAt);
     }
 
     [Fact]
