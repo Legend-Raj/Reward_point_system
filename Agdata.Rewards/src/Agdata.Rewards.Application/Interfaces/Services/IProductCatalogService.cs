@@ -7,11 +7,11 @@ namespace Agdata.Rewards.Application.Interfaces.Services;
 
 public interface IProductCatalogService
 {
-    Task<Product> CreateProductAsync(string name, string? description, int pointsCost, string? imageUrl, int? stock, bool isActive = true);
-    Task<Product> UpdateProductAsync(Guid productId, string? name, string? description, int? pointsCost, string? imageUrl, int? stock, bool? isActive);
-    Task<Product> SetStockQuantityAsync(Guid productId, int? stock);
-    Task<Product> IncrementStockAsync(Guid productId, int quantity);
-    Task<Product> DecrementStockAsync(Guid productId, int quantity);
-    Task DeleteProductAsync(Guid productId);
+    Task<Product> CreateProductAsync(Admin admin, string name, string? description, int pointsCost, string? imageUrl, int? stock, bool isActive = true);
+    Task<Product> UpdateProductAsync(Admin admin, Guid productId, string? name, string? description, int? pointsCost, string? imageUrl, int? stock, bool? isActive);
+    Task<Product> SetStockQuantityAsync(Admin admin, Guid productId, int? stock);
+    Task<Product> IncrementStockAsync(Admin admin, Guid productId, int quantity);
+    Task<Product> DecrementStockAsync(Admin admin, Guid productId, int quantity);
+    Task DeleteProductAsync(Admin admin, Guid productId);
     Task<IReadOnlyList<Product>> GetCatalogAsync(bool onlyActive = true);
 }

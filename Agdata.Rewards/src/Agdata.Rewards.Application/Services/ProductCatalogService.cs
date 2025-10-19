@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Agdata.Rewards.Application.Interfaces;
 using Agdata.Rewards.Application.Interfaces.Repositories;
 using Agdata.Rewards.Application.Interfaces.Services;
+using Agdata.Rewards.Application.Services.Shared;
 using Agdata.Rewards.Domain.Entities;
 using Agdata.Rewards.Domain.Exceptions;
 
@@ -26,8 +27,10 @@ public class ProductCatalogService : IProductCatalogService
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<Product> CreateProductAsync(string name, string? description, int pointsCost, string? imageUrl, int? stock, bool isActive = true)
+    public async Task<Product> CreateProductAsync(Admin admin, string name, string? description, int pointsCost, string? imageUrl, int? stock, bool isActive = true)
     {
+        AdminGuard.EnsureActive(admin);
+        
         var product = Product.CreateNew(name, pointsCost, stock, description, imageUrl, isActive);
 
         _productRepository.AddProduct(product);
@@ -35,8 +38,10 @@ public class ProductCatalogService : IProductCatalogService
         return product;
     }
 
-    public async Task<Product> UpdateProductAsync(Guid productId, string? name, string? description, int? pointsCost, string? imageUrl, int? stock, bool? isActive)
+    public async Task<Product> UpdateProductAsync(Admin admin, Guid productId, string? name, string? description, int? pointsCost, string? imageUrl, int? stock, bool? isActive)
     {
+        AdminGuard.EnsureActive(admin);
+        
         var product = await _productRepository.GetProductByIdAsync(productId)
             ?? throw new DomainException(DomainErrors.Product.NotFound);
 
@@ -70,8 +75,10 @@ public class ProductCatalogService : IProductCatalogService
         return product;
     }
 
-    public async Task<Product> SetStockQuantityAsync(Guid productId, int? stock)
+    public async Task<Product> SetStockQuantityAsync(Admin admin, Guid productId, int? stock)
     {
+        AdminGuard.EnsureActive(admin);
+        
         var product = await _productRepository.GetProductByIdAsync(productId)
             ?? throw new DomainException(DomainErrors.Product.NotFound);
 
@@ -83,8 +90,10 @@ public class ProductCatalogService : IProductCatalogService
         return product;
     }
 
-    public async Task<Product> IncrementStockAsync(Guid productId, int quantity)
+    public async Task<Product> IncrementStockAsync(Admin admin, Guid productId, int quantity)
     {
+        AdminGuard.EnsureActive(admin);
+        
         var product = await _productRepository.GetProductByIdAsync(productId)
             ?? throw new DomainException(DomainErrors.Product.NotFound);
 
@@ -96,8 +105,10 @@ public class ProductCatalogService : IProductCatalogService
         return product;
     }
 
-    public async Task<Product> DecrementStockAsync(Guid productId, int quantity)
+    public async Task<Product> DecrementStockAsync(Admin admin, Guid productId, int quantity)
     {
+        AdminGuard.EnsureActive(admin);
+        
         var product = await _productRepository.GetProductByIdAsync(productId)
             ?? throw new DomainException(DomainErrors.Product.NotFound);
 
@@ -109,8 +120,10 @@ public class ProductCatalogService : IProductCatalogService
         return product;
     }
 
-    public async Task DeleteProductAsync(Guid productId)
+    public async Task DeleteProductAsync(Admin admin, Guid productId)
     {
+        AdminGuard.EnsureActive(admin);
+        
         if (await _redemptionRepository.AnyPendingRedemptionRequestsForProductAsync(productId))
         {
             throw new DomainException(DomainErrors.Product.CannotDeleteWithPending);

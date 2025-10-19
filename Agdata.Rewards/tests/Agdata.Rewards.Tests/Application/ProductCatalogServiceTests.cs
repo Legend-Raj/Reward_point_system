@@ -15,13 +15,17 @@ public class ProductCatalogServiceTests
     private static ProductCatalogService BuildService(ProductRepositoryInMemory productRepo, RedemptionRequestRepositoryInMemory redemptionRepo)
         => new(productRepo, redemptionRepo, new InMemoryUnitOfWork());
 
+    private static Admin CreateTestAdmin()
+        => Admin.CreateNew("Test", "Admin", "User", "admin@test.com", "TST-001");
+
     [Fact]
     public async Task CreateProductAsync_ShouldPersistProduct()
     {
         var productRepo = new ProductRepositoryInMemory();
     var service = BuildService(productRepo, new RedemptionRequestRepositoryInMemory());
 
-        var product = await service.CreateProductAsync("AGDATA Field Jacket", "Premium insulated jacket", 1200, "https://example.com/jacket.png", 20, true);
+        var admin = CreateTestAdmin();
+        var product = await service.CreateProductAsync(admin, "AGDATA Field Jacket", "Premium insulated jacket", 1200, "https://example.com/jacket.png", 20, true);
 
         var stored = await productRepo.GetProductByIdAsync(product.Id);
         Assert.NotNull(stored);
@@ -38,7 +42,8 @@ public class ProductCatalogServiceTests
         var productRepo = new ProductRepositoryInMemory();
     var service = BuildService(productRepo, new RedemptionRequestRepositoryInMemory());
 
-        var product = await service.CreateProductAsync("AGDATA Legacy Pin", null, 75, null, null, true);
+        var admin = CreateTestAdmin();
+        var product = await service.CreateProductAsync(admin, "AGDATA Legacy Pin", null, 75, null, null, true);
 
         Assert.Null(product.Stock);
         var persisted = await productRepo.GetProductByIdAsync(product.Id);
@@ -52,8 +57,9 @@ public class ProductCatalogServiceTests
     {
         var productRepo = new ProductRepositoryInMemory();
     var service = BuildService(productRepo, new RedemptionRequestRepositoryInMemory());
-        var inactive = await service.CreateProductAsync("AGDATA Collector Edition", "Limited run", 3000, null, 1, false);
-        var active = await service.CreateProductAsync("AGDATA Field Notebook", null, 90, null, null, true);
+        var admin = CreateTestAdmin();
+        var inactive = await service.CreateProductAsync(admin, "AGDATA Collector Edition", "Limited run", 3000, null, 1, false);
+        var active = await service.CreateProductAsync(admin, "AGDATA Field Notebook", null, 90, null, null, true);
 
         var defaultCatalog = await service.GetCatalogAsync();
         Assert.DoesNotContain(defaultCatalog, product => product.Id == inactive.Id);
@@ -69,9 +75,10 @@ public class ProductCatalogServiceTests
     {
         var productRepo = new ProductRepositoryInMemory();
     var service = BuildService(productRepo, new RedemptionRequestRepositoryInMemory());
-        var product = await service.CreateProductAsync("AGDATA Coffee Cup", "Classic camp mug", 150, "https://example.com/mug.png", 10, true);
+        var admin = CreateTestAdmin();
+        var product = await service.CreateProductAsync(admin, "AGDATA Coffee Cup", "Classic camp mug", 150, "https://example.com/mug.png", 10, true);
 
-        var updated = await service.UpdateProductAsync(product.Id, "AGDATA Steel Tumbler", null, null, null, 5, false);
+        var updated = await service.UpdateProductAsync(admin, product.Id, "AGDATA Steel Tumbler", null, null, null, 5, false);
 
         Assert.Equal("AGDATA Steel Tumbler", updated.Name);
         Assert.Equal(150, updated.PointsCost);
@@ -86,9 +93,10 @@ public class ProductCatalogServiceTests
     {
         var productRepo = new ProductRepositoryInMemory();
     var service = BuildService(productRepo, new RedemptionRequestRepositoryInMemory());
-        var product = await service.CreateProductAsync("AGDATA Windbreaker", "Wind resistant", 400, null, 3, false);
+        var admin = CreateTestAdmin();
+        var product = await service.CreateProductAsync(admin, "AGDATA Windbreaker", "Wind resistant", 400, null, 3, false);
 
-        var reactivated = await service.UpdateProductAsync(product.Id, null, null, null, null, null, true);
+        var reactivated = await service.UpdateProductAsync(admin, product.Id, null, null, null, null, null, true);
 
         Assert.True(reactivated.IsActive);
         var catalog = await service.GetCatalogAsync();
@@ -100,15 +108,16 @@ public class ProductCatalogServiceTests
     {
         var productRepo = new ProductRepositoryInMemory();
         var service = BuildService(productRepo, new RedemptionRequestRepositoryInMemory());
-        var product = await service.CreateProductAsync("AGDATA Field Hat", null, 150, null, 10, true);
+        var admin = CreateTestAdmin();
+        var product = await service.CreateProductAsync(admin, "AGDATA Field Hat", null, 150, null, 10, true);
 
-        var updated = await service.SetStockQuantityAsync(product.Id, 25);
+        var updated = await service.SetStockQuantityAsync(admin, product.Id, 25);
 
         Assert.Equal(25, updated.Stock);
         var persisted = await productRepo.GetProductByIdAsync(product.Id);
         Assert.Equal(25, persisted!.Stock);
 
-        updated = await service.SetStockQuantityAsync(product.Id, null);
+        updated = await service.SetStockQuantityAsync(admin, product.Id, null);
         Assert.Null(updated.Stock);
     }
 
@@ -117,9 +126,10 @@ public class ProductCatalogServiceTests
     {
         var productRepo = new ProductRepositoryInMemory();
         var service = BuildService(productRepo, new RedemptionRequestRepositoryInMemory());
-        var product = await service.CreateProductAsync("AGDATA Backpack", null, 500, null, 2, true);
+        var admin = CreateTestAdmin();
+        var product = await service.CreateProductAsync(admin, "AGDATA Backpack", null, 500, null, 2, true);
 
-        var updated = await service.IncrementStockAsync(product.Id, 3);
+        var updated = await service.IncrementStockAsync(admin, product.Id, 3);
 
         Assert.Equal(5, updated.Stock);
         Assert.Equal(5, (await productRepo.GetProductByIdAsync(product.Id))!.Stock);
@@ -130,9 +140,10 @@ public class ProductCatalogServiceTests
     {
         var productRepo = new ProductRepositoryInMemory();
         var service = BuildService(productRepo, new RedemptionRequestRepositoryInMemory());
-        var product = await service.CreateProductAsync("AGDATA Hoodie", null, 350, null, 4, true);
+        var admin = CreateTestAdmin();
+        var product = await service.CreateProductAsync(admin, "AGDATA Hoodie", null, 350, null, 4, true);
 
-        var updated = await service.DecrementStockAsync(product.Id, 2);
+        var updated = await service.DecrementStockAsync(admin, product.Id, 2);
 
         Assert.Equal(2, updated.Stock);
         Assert.Equal(2, (await productRepo.GetProductByIdAsync(product.Id))!.Stock);
@@ -143,9 +154,10 @@ public class ProductCatalogServiceTests
     {
         var productRepo = new ProductRepositoryInMemory();
         var service = BuildService(productRepo, new RedemptionRequestRepositoryInMemory());
-        var product = await service.CreateProductAsync("AGDATA Premium Jacket", null, 800, null, 1, true);
+        var admin = CreateTestAdmin();
+        var product = await service.CreateProductAsync(admin, "AGDATA Premium Jacket", null, 800, null, 1, true);
 
-        await Assert.ThrowsAsync<DomainException>(() => service.DecrementStockAsync(product.Id, 2));
+        await Assert.ThrowsAsync<DomainException>(() => service.DecrementStockAsync(admin, product.Id, 2));
     }
 
     [Fact]
@@ -154,11 +166,12 @@ public class ProductCatalogServiceTests
     var productRepo = new ProductRepositoryInMemory();
     var redemptionRepo = new RedemptionRequestRepositoryInMemory();
         var service = BuildService(productRepo, redemptionRepo);
-        var product = await service.CreateProductAsync("AGDATA Drone", null, 2500, null, 5, true);
+        var admin = CreateTestAdmin();
+        var product = await service.CreateProductAsync(admin, "AGDATA Drone", null, 2500, null, 5, true);
         var pending = RedemptionRequest.CreateNew(Guid.NewGuid(), product.Id);
         redemptionRepo.AddRedemptionRequest(pending);
 
-        await Assert.ThrowsAsync<DomainException>(() => service.DeleteProductAsync(product.Id));
+        await Assert.ThrowsAsync<DomainException>(() => service.DeleteProductAsync(admin, product.Id));
     }
 
     [Fact]
@@ -166,9 +179,10 @@ public class ProductCatalogServiceTests
     {
         var productRepo = new ProductRepositoryInMemory();
     var service = BuildService(productRepo, new RedemptionRequestRepositoryInMemory());
-        var product = await service.CreateProductAsync("AGDATA Hydro Bottle", null, 220, null, 5, true);
+        var admin = CreateTestAdmin();
+        var product = await service.CreateProductAsync(admin, "AGDATA Hydro Bottle", null, 220, null, 5, true);
 
-        await service.DeleteProductAsync(product.Id);
+        await service.DeleteProductAsync(admin, product.Id);
 
         Assert.Null(await productRepo.GetProductByIdAsync(product.Id));
     }
@@ -179,7 +193,8 @@ public class ProductCatalogServiceTests
         var productRepo = new ProductRepositoryInMemory();
     var service = BuildService(productRepo, new RedemptionRequestRepositoryInMemory());
 
-        await Assert.ThrowsAsync<DomainException>(() => service.UpdateProductAsync(Guid.NewGuid(), "AGDATA Hoodie", null, 400, null, 10, null));
+        var admin = CreateTestAdmin();
+        await Assert.ThrowsAsync<DomainException>(() => service.UpdateProductAsync(admin, Guid.NewGuid(), "AGDATA Hoodie", null, 400, null, 10, null));
     }
 
     [Fact]
@@ -187,8 +202,9 @@ public class ProductCatalogServiceTests
     {
         var productRepo = new ProductRepositoryInMemory();
     var service = BuildService(productRepo, new RedemptionRequestRepositoryInMemory());
-        var active = await service.CreateProductAsync("AGDATA Soil Kit", null, 900, null, 15, true);
-        var inactive = await service.CreateProductAsync("AGDATA Prototype", "Lab concept", 1500, null, 2, false);
+        var admin = CreateTestAdmin();
+        var active = await service.CreateProductAsync(admin, "AGDATA Soil Kit", null, 900, null, 15, true);
+        var inactive = await service.CreateProductAsync(admin, "AGDATA Prototype", "Lab concept", 1500, null, 2, false);
 
         var activeOnly = await service.GetCatalogAsync();
         Assert.Single(activeOnly);

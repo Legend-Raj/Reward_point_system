@@ -191,6 +191,7 @@ app.MapPost("/events/{eventId:guid}/active/{isActive:bool}", async (Guid eventId
 app.MapPost("/products", async ([FromBody] CreateProductDto dto, IProductCatalogService service) =>
 {
 	var product = await service.CreateProductAsync(
+		dto.Admin.ToAdmin(),
 		dto.NormalizeName(),
 		dto.NormalizeDescription(),
 		dto.PointsCost,
@@ -209,45 +210,23 @@ app.MapGet("/products", async ([FromQuery] bool? onlyActive, IProductCatalogServ
 app.MapPatch("/products/{productId:guid}", async (
 	Guid productId,
 	[FromBody] UpdateProductDto dto,
-	IProductRepository productRepository,
-	IUnitOfWork unitOfWork) =>
+	IProductCatalogService service) =>
 {
-	var product = await productRepository.GetProductByIdAsync(productId)
-		?? throw new DomainException(DomainErrors.Product.NotFound);
-
-	var mergedName = dto.NormalizeName() ?? product.Name;
-	var mergedDescription = dto.TryGetDescription(product.Description);
-	var mergedPointsCost = dto.PointsCost ?? product.PointsCost;
-	var mergedImageUrl = dto.TryGetImageUrl(product.ImageUrl);
-
-	product.ApplyDetails(mergedName, mergedDescription, mergedPointsCost, mergedImageUrl);
-
-	if (dto.Stock.HasValue)
-	{
-		product.UpdateStockQuantity(dto.Stock);
-	}
-
-	if (dto.IsActive.HasValue)
-	{
-		if (dto.IsActive.Value)
-		{
-			product.MakeActive();
-		}
-		else
-		{
-			product.MakeInactive();
-		}
-	}
-
-	productRepository.UpdateProduct(product);
-	await unitOfWork.SaveChangesAsync();
-
+	var product = await service.UpdateProductAsync(
+		dto.Admin.ToAdmin(),
+		productId,
+		dto.Name,
+		dto.Description,
+		dto.PointsCost,
+		dto.ImageUrl,
+		dto.Stock,
+		dto.IsActive);
 	return Results.Ok(product);
 }).WithName("UpdateProduct");
 
-app.MapDelete("/products/{productId:guid}", async (Guid productId, IProductCatalogService service) =>
+app.MapDelete("/products/{productId:guid}", async (Guid productId, [FromBody] AdminActionDto admin, IProductCatalogService service) =>
 {
-	await service.DeleteProductAsync(productId);
+	await service.DeleteProductAsync(admin.ToAdmin(), productId);
 	return Results.NoContent();
 }).WithName("DeleteProduct");
 
@@ -304,14 +283,14 @@ redemptionRequests.MapPost("/{requestId:guid}/cancel", async (Guid requestId, [F
 
 app.Run();
 
-public sealed record CreateProductDto(string Name, string? Description, int PointsCost, string? ImageUrl, int? Stock, bool IsActive = true)
+public sealed record CreateProductDto(AdminActionDto Admin, string Name, string? Description, int PointsCost, string? ImageUrl, int? Stock, bool IsActive = true)
 {
 	public string NormalizeName() => Name.Trim();
 	public string? NormalizeDescription() => string.IsNullOrWhiteSpace(Description) ? null : Description.Trim();
 	public string? NormalizeImageUrl() => string.IsNullOrWhiteSpace(ImageUrl) ? null : ImageUrl.Trim();
 }
 
-public sealed record UpdateProductDto(string? Name, string? Description, int? PointsCost, string? ImageUrl, int? Stock, bool? IsActive)
+public sealed record UpdateProductDto(AdminActionDto Admin, string? Name, string? Description, int? PointsCost, string? ImageUrl, int? Stock, bool? IsActive)
 {
 	public string? NormalizeName() => Name?.Trim();
 	public string? TryGetDescription(string? current) => Description is null ? current : (string.IsNullOrWhiteSpace(Description) ? null : Description.Trim());
