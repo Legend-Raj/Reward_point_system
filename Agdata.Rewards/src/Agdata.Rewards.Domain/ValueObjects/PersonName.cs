@@ -1,6 +1,6 @@
 using System;
-using System.Globalization;
 using Agdata.Rewards.Domain.Exceptions;
+using Agdata.Rewards.Domain.Extensions;
 
 namespace Agdata.Rewards.Domain.ValueObjects;
 
@@ -26,9 +26,9 @@ public sealed class PersonName : IEquatable<PersonName>
             throw new DomainException(DomainErrors.PersonName.LastRequired);
         }
 
-    FirstName = NormalizeComponent(firstName);
-    MiddleName = string.IsNullOrWhiteSpace(middleName) ? null : NormalizeComponent(middleName);
-    LastName = NormalizeComponent(lastName);
+    FirstName = firstName.NormalizeForDisplay();
+    MiddleName = string.IsNullOrWhiteSpace(middleName) ? null : middleName.NormalizeForDisplay();
+    LastName = lastName.NormalizeForDisplay();
     }
 
     public static PersonName Create(string firstName, string? middleName, string lastName)
@@ -64,15 +64,4 @@ public sealed class PersonName : IEquatable<PersonName>
             LastName.ToLowerInvariant());
     }
 
-    private static string NormalizeComponent(string value)
-    {
-        var collapsed = CollapseWhitespace(value);
-        var lowered = collapsed.ToLowerInvariant();
-        return CultureInfo.InvariantCulture.TextInfo.ToTitleCase(lowered);
-    }
-
-    private static string CollapseWhitespace(string value)
-    {
-        return string.Join(' ', value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
-    }
 }

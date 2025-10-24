@@ -29,52 +29,6 @@ public class UserTests
         Assert.True((DateTimeOffset.UtcNow - user.CreatedAt) < TimeSpan.FromSeconds(5));
     }
 
-    [Fact]
-    public void CreditPoints_ShouldIncreaseTotals()
-    {
-        var parts = NameTestHelper.Split("Brooke Chen");
-        var user = User.CreateNew(parts.First, parts.Middle, parts.Last, "brooke.chen@agdata.com", "AGD-100");
-
-        user.CreditPoints(250);
-
-        Assert.Equal(250, user.TotalPoints);
-        Assert.Equal(250, user.AvailablePoints);
-    }
-
-    [Fact]
-    public void CreditPoints_WhenNonPositive_ShouldThrow()
-    {
-        var parts = NameTestHelper.Split("Chad Patel");
-        var user = User.CreateNew(parts.First, parts.Middle, parts.Last, "chad.patel@agdata.com", "AGD-200");
-
-        Assert.Throws<DomainException>(() => user.CreditPoints(0));
-        Assert.Throws<DomainException>(() => user.CreditPoints(-5));
-    }
-
-    [Fact]
-    public void ReservePoints_WhenInsufficient_ShouldThrow()
-    {
-        var parts = NameTestHelper.Split("Dana Li");
-        var user = User.CreateNew(parts.First, parts.Middle, parts.Last, "dana.li@agdata.com", "AGD-300");
-        user.CreditPoints(100);
-
-        Assert.Throws<DomainException>(() => user.ReservePoints(200));
-    }
-
-    [Fact]
-    public void CaptureReservedPoints_ShouldReduceTotals()
-    {
-        var parts = NameTestHelper.Split("Evan Ross");
-        var user = User.CreateNew(parts.First, parts.Middle, parts.Last, "evan.ross@agdata.com", "AGD-400");
-        user.CreditPoints(500);
-        user.ReservePoints(200);
-
-        user.CaptureReservedPoints(200);
-
-        Assert.Equal(300, user.TotalPoints);
-        Assert.Equal(0, user.LockedPoints);
-        Assert.Equal(300, user.AvailablePoints);
-    }
 
     [Fact]
     public void Rename_ShouldTrimAndPersist()
@@ -109,8 +63,7 @@ public class UserTests
 
         var afterNameUpdate = user.UpdatedAt;
 
-        user.CreditPoints(50);
-        Assert.True(user.UpdatedAt > afterNameUpdate);
+        // Points operations moved to PointsService
     }
 
     [Fact]
@@ -189,57 +142,6 @@ public class UserTests
         Assert.Throws<DomainException>(() => new User(Guid.NewGuid(), name, email, employeeId, totalPoints: 10, lockedPoints: 20));
     }
 
-    [Fact]
-    public void ReservePoints_WhenAmountNotPositive_ShouldThrow()
-    {
-        var parts = NameTestHelper.Split("Gabe Nolan");
-        var user = User.CreateNew(parts.First, parts.Middle, parts.Last, "gabe.nolan@agdata.com", "AGD-600");
-        user.CreditPoints(100);
-
-        Assert.Throws<DomainException>(() => user.ReservePoints(0));
-        Assert.Throws<DomainException>(() => user.ReservePoints(-25));
-    }
-
-    [Fact]
-    public void ReleaseReservedPoints_ShouldReduceLockedBalance()
-    {
-        var parts = NameTestHelper.Split("Harper Singh");
-        var user = User.CreateNew(parts.First, parts.Middle, parts.Last, "harper.singh@agdata.com", "AGD-610");
-        user.CreditPoints(400);
-        user.ReservePoints(250);
-
-        user.ReleaseReservedPoints(150);
-
-        Assert.Equal(400, user.TotalPoints);
-        Assert.Equal(100, user.LockedPoints);
-        Assert.Equal(300, user.AvailablePoints);
-    }
-
-    [Fact]
-    public void ReleaseReservedPoints_WhenExceedingReserved_ShouldThrow()
-    {
-        var parts = NameTestHelper.Split("Isla Brooks");
-        var user = User.CreateNew(parts.First, parts.Middle, parts.Last, "isla.brooks@agdata.com", "AGD-620");
-        user.CreditPoints(150);
-        user.ReservePoints(100);
-
-        Assert.Throws<DomainException>(() => user.ReleaseReservedPoints(0));
-        Assert.Throws<DomainException>(() => user.ReleaseReservedPoints(-10));
-        Assert.Throws<DomainException>(() => user.ReleaseReservedPoints(150));
-    }
-
-    [Fact]
-    public void CaptureReservedPoints_WhenExceedingReserved_ShouldThrow()
-    {
-        var parts = NameTestHelper.Split("Jonah Patel");
-        var user = User.CreateNew(parts.First, parts.Middle, parts.Last, "jonah.patel@agdata.com", "AGD-630");
-        user.CreditPoints(180);
-        user.ReservePoints(80);
-
-        Assert.Throws<DomainException>(() => user.CaptureReservedPoints(0));
-        Assert.Throws<DomainException>(() => user.CaptureReservedPoints(-5));
-        Assert.Throws<DomainException>(() => user.CaptureReservedPoints(100));
-    }
 
     [Fact]
     public void ActivationFlow_ShouldToggleStates()
@@ -254,14 +156,4 @@ public class UserTests
         Assert.True(user.IsActive);
     }
 
-    [Fact]
-    public void CreditPoints_WhenOverflowing_ShouldThrow()
-    {
-        var email = new Email("overflow@agdata.com");
-        var employeeId = new EmployeeId("AGD-650");
-        var name = PersonName.Create("Overflow", null, "Check");
-        var user = new User(Guid.NewGuid(), name, email, employeeId, totalPoints: int.MaxValue);
-
-        Assert.Throws<OverflowException>(() => user.CreditPoints(1));
-    }
 }

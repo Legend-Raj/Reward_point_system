@@ -23,7 +23,7 @@ public class PointsLedgerServiceTests
 
         public void AddLedgerEntry(LedgerEntry entry) => Entries.Add(entry);
 
-        public Task<IReadOnlyList<LedgerEntry>> ListLedgerEntriesByUserAsync(Guid userId)
+        public Task<IReadOnlyList<LedgerEntry>> ListLedgerEntriesByUserAsync(Guid userId, CancellationToken cancellationToken = default)
         {
             var slice = Entries
                 .Where(tx => tx.UserId == userId)
@@ -42,7 +42,8 @@ public class PointsLedgerServiceTests
         var eventRepo = new EventRepositoryInMemory();
         var ledgerRepo = new CapturingLedgerEntryRepository();
         var unitOfWork = new InMemoryUnitOfWork();
-        var service = new PointsLedgerService(userRepo, eventRepo, ledgerRepo, unitOfWork);
+        var pointsService = new PointsService(userRepo, unitOfWork);
+        var service = new PointsLedgerService(userRepo, eventRepo, ledgerRepo, pointsService, unitOfWork);
         return (service, userRepo, eventRepo, ledgerRepo);
     }
 

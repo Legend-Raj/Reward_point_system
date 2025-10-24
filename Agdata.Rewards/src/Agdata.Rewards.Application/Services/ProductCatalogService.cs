@@ -59,14 +59,8 @@ public class ProductCatalogService : IProductCatalogService
 
         if (isActive.HasValue)
         {
-            if (isActive.Value)
-            {
-                product.MakeActive();
-            }
-            else
-            {
-                product.MakeInactive();
-            }
+            if (isActive.Value) product.MakeActive();
+            else product.MakeInactive();
         }
 
         _productRepository.UpdateProduct(product);

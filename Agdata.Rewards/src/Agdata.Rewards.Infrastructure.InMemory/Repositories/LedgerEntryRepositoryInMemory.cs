@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Agdata.Rewards.Application.Interfaces.Repositories;
 using Agdata.Rewards.Domain.Entities;
@@ -20,7 +21,7 @@ public class LedgerEntryRepositoryInMemory : ILedgerEntryRepository
         }
     }
 
-    public Task<IReadOnlyList<LedgerEntry>> ListLedgerEntriesByUserAsync(Guid userId)
+    public Task<IReadOnlyList<LedgerEntry>> ListLedgerEntriesByUserAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         lock (_gate)
         {

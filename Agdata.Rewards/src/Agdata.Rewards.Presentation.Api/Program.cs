@@ -8,6 +8,7 @@ using Agdata.Rewards.Application.Interfaces;
 using Agdata.Rewards.Domain.Entities;
 using Agdata.Rewards.Domain.Exceptions;
 using Agdata.Rewards.Domain.ValueObjects;
+using Agdata.Rewards.Domain.Extensions;
 using Agdata.Rewards.Infrastructure.InMemory;
 using Agdata.Rewards.Presentation.Api.Models.Requests;
 using Agdata.Rewards.Presentation.Api.Models.Responses;
@@ -54,7 +55,12 @@ app.MapGet("/", () => Results.Ok("Rewards API is running"))
    .WithName("GetStatus")
    .Produces<string>(StatusCodes.Status200OK, MediaTypeNames.Application.Json);
 
-app.MapPost("/users", async ([FromBody] CreateUserRequest request, IUserService service) =>
+// ============================================================================
+// USER ENDPOINTS (Public - self-service user management)
+// ============================================================================
+var users = app.MapGroup("/users").WithTags("Users");
+
+users.MapPost(string.Empty, async ([FromBody] CreateUserRequest request, IUserService service) =>
 {
 	var errors = RequestValidator.Validate(request);
 	if (errors.Count > 0)
@@ -71,7 +77,7 @@ app.MapPost("/users", async ([FromBody] CreateUserRequest request, IUserService 
 	return Results.Created($"/users/{user.Id}", UserResponse.From(user));
 }).WithName("CreateUser");
 
-app.MapPatch("/users/{userId:guid}", async (
+users.MapPatch("/{userId:guid}", async (
 	Guid userId,
 	[FromBody] UpdateUserRequest request,
 	IUserRepository userRepository,
@@ -142,13 +148,18 @@ app.MapPatch("/users/{userId:guid}", async (
 	return Results.Ok(UserResponse.From(user));
 }).WithName("UpdateUser");
 
-app.MapGet("/users/{userId:guid}", async (Guid userId, IUserService service) =>
+users.MapGet("/{userId:guid}", async (Guid userId, IUserService service) =>
 {
 	var user = await service.GetUserByIdAsync(userId);
 	return user is null ? Results.NotFound() : Results.Ok(UserResponse.From(user));
 }).WithName("GetUser");
 
-app.MapPost("/events", async ([FromBody] CreateEventRequest request, IEventService eventService) =>
+// ============================================================================
+// ADMIN - EVENT MANAGEMENT ENDPOINTS (Admin-only)
+// ============================================================================
+var adminEvents = app.MapGroup("/admin/events").WithTags("Admin - Events");
+
+adminEvents.MapPost(string.Empty, async ([FromBody] CreateEventRequest request, IEventService eventService) =>
 {
 	var errors = RequestValidator.Validate(request);
 	if (errors.Count > 0)
@@ -157,10 +168,10 @@ app.MapPost("/events", async ([FromBody] CreateEventRequest request, IEventServi
 	}
 
 	var created = await eventService.CreateEventAsync(request.Admin!.ToAdmin(), request.NormalizeName(), request.NormalizeOccursAt(), request.IsActive);
-	return Results.Created($"/events/{created.Id}", created);
+	return Results.Created($"/admin/events/{created.Id}", created);
 }).WithName("CreateEvent");
 
-app.MapPut("/events/{eventId:guid}", async (Guid eventId, [FromBody] UpdateEventRequest request, IEventService eventService) =>
+adminEvents.MapPut("/{eventId:guid}", async (Guid eventId, [FromBody] UpdateEventRequest request, IEventService eventService) =>
 {
 	var errors = RequestValidator.Validate(request);
 	if (errors.Count > 0)
@@ -172,7 +183,18 @@ app.MapPut("/events/{eventId:guid}", async (Guid eventId, [FromBody] UpdateEvent
 	return Results.Ok(updated);
 }).WithName("UpdateEvent");
 
-app.MapGet("/events", async ([FromQuery] bool? onlyActive, IEventService eventService) =>
+adminEvents.MapPost("/{eventId:guid}/active/{isActive:bool}", async (Guid eventId, bool isActive, [FromBody] AdminActionDto admin, IEventService eventService) =>
+{
+	var evt = await eventService.SetEventActiveStateAsync(admin.ToAdmin(), eventId, isActive);
+	return Results.Ok(evt);
+}).WithName("SetEventActive");
+
+// ============================================================================
+// PUBLIC - EVENT BROWSING (Read-only access for users)
+// ============================================================================
+var events = app.MapGroup("/events").WithTags("Events");
+
+events.MapGet(string.Empty, async ([FromQuery] bool? onlyActive, IEventService eventService) =>
 {
 	if (onlyActive.GetValueOrDefault(true))
 	{
@@ -182,13 +204,12 @@ app.MapGet("/events", async ([FromQuery] bool? onlyActive, IEventService eventSe
 	return Results.Ok(await eventService.GetAllEventsAsync());
 }).WithName("ListEvents").Produces(StatusCodes.Status200OK);
 
-app.MapPost("/events/{eventId:guid}/active/{isActive:bool}", async (Guid eventId, bool isActive, [FromBody] AdminActionDto admin, IEventService eventService) =>
-{
-	var evt = await eventService.SetEventActiveStateAsync(admin.ToAdmin(), eventId, isActive);
-	return Results.Ok(evt);
-}).WithName("SetEventActive");
+// ============================================================================
+// ADMIN - PRODUCT MANAGEMENT ENDPOINTS (Admin-only)
+// ============================================================================
+var adminProducts = app.MapGroup("/admin/products").WithTags("Admin - Products");
 
-app.MapPost("/products", async ([FromBody] CreateProductDto dto, IProductCatalogService service) =>
+adminProducts.MapPost(string.Empty, async ([FromBody] CreateProductDto dto, IProductCatalogService service) =>
 {
 	var product = await service.CreateProductAsync(
 		dto.Admin.ToAdmin(),
@@ -198,16 +219,10 @@ app.MapPost("/products", async ([FromBody] CreateProductDto dto, IProductCatalog
 		dto.NormalizeImageUrl(),
 		dto.Stock,
 		dto.IsActive);
-	return Results.Created($"/products/{product.Id}", product);
+	return Results.Created($"/admin/products/{product.Id}", product);
 }).WithName("CreateProduct");
 
-app.MapGet("/products", async ([FromQuery] bool? onlyActive, IProductCatalogService service) =>
-{
-	var products = await service.GetCatalogAsync(onlyActive ?? true);
-	return Results.Ok(products);
-}).WithName("ListProducts");
-
-app.MapPatch("/products/{productId:guid}", async (
+adminProducts.MapPatch("/{productId:guid}", async (
 	Guid productId,
 	[FromBody] UpdateProductDto dto,
 	IProductCatalogService service) =>
@@ -224,20 +239,41 @@ app.MapPatch("/products/{productId:guid}", async (
 	return Results.Ok(product);
 }).WithName("UpdateProduct");
 
-app.MapDelete("/products/{productId:guid}", async (Guid productId, [FromBody] AdminActionDto admin, IProductCatalogService service) =>
+adminProducts.MapDelete("/{productId:guid}", async (Guid productId, [FromBody] AdminActionDto admin, IProductCatalogService service) =>
 {
 	await service.DeleteProductAsync(admin.ToAdmin(), productId);
 	return Results.NoContent();
 }).WithName("DeleteProduct");
 
-app.MapPost("/points/earn", async ([FromBody] EarnPointsWithAdminDto dto, IPointsLedgerService service) =>
+// ============================================================================
+// PUBLIC - PRODUCT CATALOG (Read-only access for users)
+// ============================================================================
+var products = app.MapGroup("/products").WithTags("Products");
+
+products.MapGet(string.Empty, async ([FromQuery] bool? onlyActive, IProductCatalogService service) =>
+{
+	var productList = await service.GetCatalogAsync(onlyActive ?? true);
+	return Results.Ok(productList);
+}).WithName("ListProducts");
+
+// ============================================================================
+// ADMIN - POINTS ALLOCATION (Admin-only)
+// ============================================================================
+var adminPoints = app.MapGroup("/admin/points").WithTags("Admin - Points");
+
+adminPoints.MapPost("/earn", async ([FromBody] EarnPointsWithAdminDto dto, IPointsLedgerService service) =>
 {
 	var actor = dto.ToAdmin();
 	var transaction = await service.EarnAsync(actor, dto.UserId, dto.EventId, dto.Points);
 	return Results.Ok(transaction);
 }).WithName("EarnPoints");
 
-app.MapGet("/points/history/{userId:guid}", async (Guid userId, [FromQuery] int? skip, [FromQuery] int? take, IPointsLedgerService service) =>
+// ============================================================================
+// PUBLIC - POINTS HISTORY (User can view their own transaction history)
+// ============================================================================
+var points = app.MapGroup("/points").WithTags("Points");
+
+points.MapGet("/history/{userId:guid}", async (Guid userId, [FromQuery] int? skip, [FromQuery] int? take, IPointsLedgerService service) =>
 {
 	const int defaultTake = 50;
 	var page = await service.GetUserTransactionHistoryAsync(userId, skip.GetValueOrDefault(0), take.GetValueOrDefault(defaultTake));
@@ -249,32 +285,40 @@ app.MapGet("/points/history/{userId:guid}", async (Guid userId, [FromQuery] int?
 	return Results.Ok(response);
 }).WithName("GetPointsHistory");
 
-var redemptionRequests = app.MapGroup("/redemption-requests");
+// ============================================================================
+// REDEMPTION REQUESTS (Mixed - submit is user, actions are admin)
+// ============================================================================
+var redemptionRequests = app.MapGroup("/redemption-requests").WithTags("Redemptions");
 
+// User action: Submit redemption request
 redemptionRequests.MapPost(string.Empty, async ([FromBody] SubmitRedemptionRequestDto dto, IRedemptionRequestService service) =>
 {
 	var requestId = await service.RequestRedemptionAsync(dto.UserId, dto.ProductId);
 	return Results.Accepted($"/redemption-requests/{requestId}", new { Id = requestId });
 }).WithName("SubmitRedemptionRequest");
 
+// Admin action: Approve redemption
 redemptionRequests.MapPost("/{requestId:guid}/approve", async (Guid requestId, [FromBody] AdminActionDto dto, IRedemptionRequestService service) =>
 {
 	await service.ApproveRedemptionAsync(dto.ToAdmin(), requestId);
 	return Results.NoContent();
 }).WithName("ApproveRedemptionRequest");
 
+// Admin action: Deliver redemption
 redemptionRequests.MapPost("/{requestId:guid}/deliver", async (Guid requestId, [FromBody] AdminActionDto dto, IRedemptionRequestService service) =>
 {
 	await service.DeliverRedemptionAsync(dto.ToAdmin(), requestId);
 	return Results.NoContent();
 }).WithName("DeliverRedemptionRequest");
 
+// Admin action: Reject redemption
 redemptionRequests.MapPost("/{requestId:guid}/reject", async (Guid requestId, [FromBody] AdminActionDto dto, IRedemptionRequestService service) =>
 {
 	await service.RejectRedemptionAsync(dto.ToAdmin(), requestId);
 	return Results.NoContent();
 }).WithName("RejectRedemptionRequest");
 
+// Admin action: Cancel redemption
 redemptionRequests.MapPost("/{requestId:guid}/cancel", async (Guid requestId, [FromBody] AdminActionDto dto, IRedemptionRequestService service) =>
 {
 	await service.CancelRedemptionAsync(dto.ToAdmin(), requestId);
@@ -285,16 +329,16 @@ app.Run();
 
 public sealed record CreateProductDto(AdminActionDto Admin, string Name, string? Description, int PointsCost, string? ImageUrl, int? Stock, bool IsActive = true)
 {
-	public string NormalizeName() => Name.Trim();
-	public string? NormalizeDescription() => string.IsNullOrWhiteSpace(Description) ? null : Description.Trim();
-	public string? NormalizeImageUrl() => string.IsNullOrWhiteSpace(ImageUrl) ? null : ImageUrl.Trim();
+	public string NormalizeName() => Name.NormalizeRequired();
+	public string? NormalizeDescription() => Description.NormalizeOptional();
+	public string? NormalizeImageUrl() => ImageUrl.NormalizeOptional();
 }
 
 public sealed record UpdateProductDto(AdminActionDto Admin, string? Name, string? Description, int? PointsCost, string? ImageUrl, int? Stock, bool? IsActive)
 {
-	public string? NormalizeName() => Name?.Trim();
-	public string? TryGetDescription(string? current) => Description is null ? current : (string.IsNullOrWhiteSpace(Description) ? null : Description.Trim());
-	public string? TryGetImageUrl(string? current) => ImageUrl is null ? current : (string.IsNullOrWhiteSpace(ImageUrl) ? null : ImageUrl.Trim());
+	public string? NormalizeName() => Name?.NormalizeRequired();
+	public string? TryGetDescription(string? current) => Description is null ? current : Description.NormalizeOptional();
+	public string? TryGetImageUrl(string? current) => ImageUrl is null ? current : ImageUrl.NormalizeOptional();
 }
 
 public sealed record AdminActionDto(string FirstName, string? MiddleName, string LastName, string Email, string EmployeeId)

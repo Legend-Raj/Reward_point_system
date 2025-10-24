@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using Agdata.Rewards.Domain.Exceptions;
+using Agdata.Rewards.Domain.Extensions;
 
 namespace Agdata.Rewards.Presentation.Api.Models.Requests;
 
@@ -36,7 +37,7 @@ public sealed class CreateEventRequest : IValidatableObject
         }
     }
 
-    public string NormalizeName() => Name.Trim();
+    public string NormalizeName() => Name.NormalizeRequired();
 
     public DateTimeOffset NormalizeOccursAt() => OccursAt!.Value;
 }
@@ -70,7 +71,7 @@ public sealed class UpdateEventRequest : IValidatableObject
         }
     }
 
-    public string NormalizeName() => Name.Trim();
+    public string NormalizeName() => Name.NormalizeRequired();
 
     public DateTimeOffset NormalizeOccursAt() => OccursAt!.Value;
 }

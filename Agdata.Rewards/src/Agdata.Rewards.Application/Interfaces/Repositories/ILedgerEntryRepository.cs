@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Agdata.Rewards.Domain.Entities;
 
@@ -14,5 +15,5 @@ public interface ILedgerEntryRepository
     void AddLedgerEntry(LedgerEntry entry);
 
     /// <summary>Lists ledger entries recorded for a specific user.</summary>
-    Task<IReadOnlyList<LedgerEntry>> ListLedgerEntriesByUserAsync(Guid userId);
+    Task<IReadOnlyList<LedgerEntry>> ListLedgerEntriesByUserAsync(Guid userId, CancellationToken cancellationToken = default);
 }

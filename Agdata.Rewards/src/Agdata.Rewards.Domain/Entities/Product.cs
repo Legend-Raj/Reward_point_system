@@ -1,5 +1,6 @@
 using System;
 using Agdata.Rewards.Domain.Exceptions;
+using Agdata.Rewards.Domain.Extensions;
 
 namespace Agdata.Rewards.Domain.Entities;
 
@@ -15,6 +16,11 @@ public sealed class Product
     public DateTimeOffset CreatedAt { get; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
+    /// <summary>
+    /// Concurrency token for optimistic locking (EF Core [Timestamp] attribute).
+    /// </summary>
+    public byte[] RowVersion { get; private set; }
+
     public Product(
         Guid productId,
         string name,
@@ -24,7 +30,8 @@ public sealed class Product
         int? stock = null,
         bool isActive = true,
         DateTimeOffset? createdAt = null,
-        DateTimeOffset? updatedAt = null)
+        DateTimeOffset? updatedAt = null,
+        byte[]? rowVersion = null)
     {
         if (productId == Guid.Empty)
         {
@@ -36,12 +43,13 @@ public sealed class Product
         ValidateStockAmount(stock);
 
     Id = productId;
-        Name = NormalizeRequired(name);
-        Description = NormalizeOptional(description);
+        Name = name.NormalizeRequired();
+        Description = description.NormalizeOptional();
         PointsCost = pointsCost;
-        ImageUrl = NormalizeOptional(imageUrl);
+        ImageUrl = imageUrl.NormalizeOptional();
         Stock = stock;
         IsActive = isActive;
+        RowVersion = rowVersion ?? Array.Empty<byte>();
 
         var created = createdAt ?? DateTimeOffset.UtcNow;
         CreatedAt = created;
@@ -86,10 +94,10 @@ public sealed class Product
         ValidateProductName(name);
         ValidatePointsCost(pointsCost);
 
-        Name = NormalizeRequired(name);
-        Description = NormalizeOptional(description);
+        Name = name.NormalizeRequired();
+        Description = description.NormalizeOptional();
         PointsCost = pointsCost;
-        ImageUrl = NormalizeOptional(imageUrl);
+        ImageUrl = imageUrl.NormalizeOptional();
 
         Touch();
     }
@@ -176,17 +184,6 @@ public sealed class Product
         }
     }
 
-    private static string NormalizeRequired(string value) => value.Trim();
-
-    private static string? NormalizeOptional(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return null;
-        }
-
-        return value.Trim();
-    }
 
     private static DateTimeOffset DetermineInitialUpdatedAt(DateTimeOffset createdAt, DateTimeOffset? updatedAt)
     {

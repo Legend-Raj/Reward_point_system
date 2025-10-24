@@ -7,9 +7,11 @@ using Agdata.Rewards.Application.DTOs.Users;
 using Agdata.Rewards.Application.Interfaces;
 using Agdata.Rewards.Application.Interfaces.Repositories;
 using Agdata.Rewards.Application.Interfaces.Services;
+using Agdata.Rewards.Application.Services.Shared;
 using Agdata.Rewards.Domain.Entities;
 using Agdata.Rewards.Domain.Exceptions;
 using Agdata.Rewards.Domain.ValueObjects;
+using Agdata.Rewards.Domain.Extensions;
 
 namespace Agdata.Rewards.Application.Services;
 
@@ -164,20 +166,9 @@ public class UserService : IUserService
             throw new ArgumentNullException(nameof(queryOptions));
         }
 
-        if (queryOptions.Skip < 0)
-        {
-            throw new DomainException(DomainErrors.Validation.SkipMustBeNonNegative);
-        }
-
-        if (queryOptions.Take <= 0)
-        {
-            throw new DomainException(DomainErrors.Validation.TakeMustBePositive);
-        }
-
-        if (queryOptions.Take > MaxPageSize)
-        {
-            throw new DomainException(DomainErrors.Validation.TakeExceedsMaximum);
-        }
+        // Streamlined validation using Guard
+        Guard.AgainstNegativeSkip(queryOptions.Skip);
+        Guard.AgainstInvalidTake(queryOptions.Take, MaxPageSize);
 
         var users = await _userRepository.ListUsersAsync();
 
@@ -190,7 +181,7 @@ public class UserService : IUserService
 
         if (!string.IsNullOrWhiteSpace(queryOptions.Search))
         {
-            var term = queryOptions.Search.Trim();
+            var term = queryOptions.Search.NormalizeText();
             filtered = filtered.Where(user => MatchesSearch(user, term));
         }
 

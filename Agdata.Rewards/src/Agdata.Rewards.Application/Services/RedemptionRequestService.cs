@@ -16,6 +16,7 @@ public class RedemptionRequestService : IRedemptionRequestService
     private readonly IProductRepository _productRepository;
     private readonly IRedemptionRequestRepository _redemptionRequestRepository;
     private readonly ILedgerEntryRepository _ledgerEntryRepository;
+    private readonly IPointsService _pointsService;
     private readonly IUnitOfWork _unitOfWork;
 
     public RedemptionRequestService(
@@ -23,48 +24,69 @@ public class RedemptionRequestService : IRedemptionRequestService
         IProductRepository productRepository,
         IRedemptionRequestRepository redemptionRequestRepository,
         ILedgerEntryRepository ledgerEntryRepository,
+        IPointsService pointsService,
         IUnitOfWork unitOfWork)
     {
         _userRepository = userRepository;
         _productRepository = productRepository;
         _redemptionRequestRepository = redemptionRequestRepository;
         _ledgerEntryRepository = ledgerEntryRepository;
+        _pointsService = pointsService;
         _unitOfWork = unitOfWork;
     }
 
     public async Task<Guid> RequestRedemptionAsync(Guid userId, Guid productId)
     {
-        var user = await _userRepository.GetUserByIdAsync(userId)
-            ?? throw new DomainException(DomainErrors.User.NotFound);
-
-        var product = await _productRepository.GetProductByIdAsync(productId)
-            ?? throw new DomainException(DomainErrors.Product.NotFound);
-
-        if (!user.IsActive)
+        const int maxRetries = 3;
+        
+        for (int attempt = 0; attempt < maxRetries; attempt++)
         {
-            throw new DomainException(DomainErrors.User.AccountInactive);
+            try
+            {
+                var user = await _userRepository.GetUserByIdAsync(userId)
+                    ?? throw new DomainException(DomainErrors.User.NotFound);
+
+                if (!user.IsActive)
+                {
+                    throw new DomainException(DomainErrors.User.AccountInactive);
+                }
+
+                var product = await _productRepository.GetProductByIdAsync(productId)
+                    ?? throw new DomainException(DomainErrors.Product.NotFound);
+
+                if (!product.IsActive)
+                {
+                    throw new DomainException(DomainErrors.Product.Inactive);
+                }
+
+                if (await _redemptionRequestRepository.HasPendingRedemptionRequestForProductAsync(userId, productId))
+                {
+                    throw new DomainException(DomainErrors.RedemptionRequest.AlreadyPending);
+                }
+
+                await _pointsService.ReservePointsAsync(user.Id, product.PointsCost);
+
+                var redemptionRequest = RedemptionRequest.CreateNew(user.Id, product.Id);
+                _redemptionRequestRepository.AddRedemptionRequest(redemptionRequest);
+
+                await _unitOfWork.SaveChangesAsync();
+                return redemptionRequest.Id;
+            }
+            catch (Exception ex) when (attempt < maxRetries - 1 && IsConcurrencyException(ex))
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(50 * (attempt + 1)));
+                continue;
+            }
         }
+        
+        throw new DomainException("Unable to complete redemption request due to concurrent modifications. Please try again.", 409);
+    }
 
-        if (!product.IsActive)
-        {
-            throw new DomainException(DomainErrors.Product.Inactive);
-        }
-
-        if (await _redemptionRequestRepository.HasPendingRedemptionRequestForProductAsync(userId, productId))
-        {
-            throw new DomainException(DomainErrors.RedemptionRequest.AlreadyPending);
-        }
-
-        user.ReservePoints(product.PointsCost);
-
-        var redemptionRequest = RedemptionRequest.CreateNew(user.Id, product.Id);
-
-        _redemptionRequestRepository.AddRedemptionRequest(redemptionRequest);
-        _userRepository.UpdateUser(user);
-
-        await _unitOfWork.SaveChangesAsync();
-
-        return redemptionRequest.Id;
+    private static bool IsConcurrencyException(Exception ex)
+    {
+        var typeName = ex.GetType().Name;
+        return typeName.Contains("Concurrency", StringComparison.OrdinalIgnoreCase) ||
+               typeName.Contains("DbUpdate", StringComparison.OrdinalIgnoreCase);
     }
 
     public async Task ApproveRedemptionAsync(Admin approver, Guid redemptionRequestId)
@@ -100,7 +122,7 @@ public class RedemptionRequestService : IRedemptionRequestService
 
         redemptionRequest.Deliver();
 
-        userAccount.CaptureReservedPoints(redeemedProduct.PointsCost);
+        await _pointsService.CapturePointsAsync(userAccount.Id, redeemedProduct.PointsCost);
 
         var ledgerEntry = new LedgerEntry(
             Guid.NewGuid(),
@@ -113,7 +135,6 @@ public class RedemptionRequestService : IRedemptionRequestService
 
         redeemedProduct.DecrementStock();
 
-        _userRepository.UpdateUser(userAccount);
         _productRepository.UpdateProduct(redeemedProduct);
         _redemptionRequestRepository.UpdateRedemptionRequest(redemptionRequest);
         await _unitOfWork.SaveChangesAsync();
@@ -133,9 +154,7 @@ public class RedemptionRequestService : IRedemptionRequestService
             ?? throw new DomainException(DomainErrors.Product.NotFound);
 
         redemptionRequest.Reject();
-        user.ReleaseReservedPoints(product.PointsCost);
-
-        _userRepository.UpdateUser(user);
+        await _pointsService.ReleasePointsAsync(user.Id, product.PointsCost);
         _redemptionRequestRepository.UpdateRedemptionRequest(redemptionRequest);
 
         await _unitOfWork.SaveChangesAsync();
@@ -155,9 +174,7 @@ public class RedemptionRequestService : IRedemptionRequestService
             ?? throw new DomainException(DomainErrors.Product.NotFound);
 
         redemptionRequest.Cancel();
-        user.ReleaseReservedPoints(product.PointsCost);
-
-        _userRepository.UpdateUser(user);
+        await _pointsService.ReleasePointsAsync(user.Id, product.PointsCost);
         _redemptionRequestRepository.UpdateRedemptionRequest(redemptionRequest);
 
         await _unitOfWork.SaveChangesAsync();

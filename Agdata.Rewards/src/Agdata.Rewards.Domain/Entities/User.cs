@@ -19,6 +19,9 @@ public class User
     public int LockedPoints { get; private set; }
     public int AvailablePoints => TotalPoints - LockedPoints;
 
+
+    public byte[] RowVersion { get; private set; }
+
     public User(
         Guid userId,
         PersonName name,
@@ -28,7 +31,8 @@ public class User
         int totalPoints = 0,
         int lockedPoints = 0,
         DateTimeOffset? createdAt = null,
-        DateTimeOffset? updatedAt = null)
+        DateTimeOffset? updatedAt = null,
+        byte[]? rowVersion = null)
     {
         if (userId == Guid.Empty)
         {
@@ -46,6 +50,7 @@ public class User
         IsActive = isActive;
         TotalPoints = totalPoints;
         LockedPoints = lockedPoints;
+        RowVersion = rowVersion ?? Array.Empty<byte>();
 
         var effectiveCreatedAt = createdAt ?? DateTimeOffset.UtcNow;
         if (effectiveCreatedAt == default)
@@ -114,66 +119,6 @@ public class User
         Touch();
     }
 
-    public void CreditPoints(int points)
-    {
-        if (points <= 0)
-        {
-            throw new DomainException(DomainErrors.User.CreditAmountMustBePositive);
-        }
-
-        checked
-        {
-            TotalPoints += points;
-        }
-
-        Touch();
-    }
-
-    public void ReservePoints(int pointsToLock)
-    {
-        if (pointsToLock <= 0)
-        {
-            throw new DomainException(DomainErrors.User.ReserveAmountMustBePositive);
-        }
-        if (AvailablePoints < pointsToLock)
-        {
-            throw new DomainException(DomainErrors.User.InsufficientPointsToReserve);
-        }
-
-        LockedPoints += pointsToLock;
-        Touch();
-    }
-
-    public void ReleaseReservedPoints(int pointsToUnlock)
-    {
-        if (pointsToUnlock <= 0)
-        {
-            throw new DomainException(DomainErrors.User.ReleaseAmountMustBePositive);
-        }
-        if (LockedPoints < pointsToUnlock)
-        {
-            throw new DomainException(DomainErrors.User.ReleaseExceedsReserved);
-        }
-
-        LockedPoints -= pointsToUnlock;
-        Touch();
-    }
-
-    public void CaptureReservedPoints(int pointsToCommit)
-    {
-        if (pointsToCommit <= 0)
-        {
-            throw new DomainException(DomainErrors.User.CaptureAmountMustBePositive);
-        }
-        if (LockedPoints < pointsToCommit)
-        {
-            throw new DomainException(DomainErrors.User.CaptureExceedsReserved);
-        }
-
-        TotalPoints -= pointsToCommit;
-        LockedPoints -= pointsToCommit;
-        Touch();
-    }
 
     public void Rename(PersonName newName)
     {

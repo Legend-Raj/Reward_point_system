@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using Agdata.Rewards.Domain.Exceptions;
+using Agdata.Rewards.Domain.Extensions;
 
 namespace Agdata.Rewards.Presentation.Api.Models.Requests;
 
@@ -27,15 +28,15 @@ public sealed class CreateUserRequest
     [RegularExpression(@"^[A-Za-z]{3}-\d+$", ErrorMessage = DomainErrors.EmployeeId.InvalidFormat)]
     public string EmployeeId { get; init; } = string.Empty;
 
-    public string NormalizeFirstName() => FirstName.Trim();
+    public string NormalizeFirstName() => FirstName.NormalizeRequired();
 
-    public string? NormalizeMiddleName() => string.IsNullOrWhiteSpace(MiddleName) ? null : MiddleName.Trim();
+    public string? NormalizeMiddleName() => MiddleName.NormalizeOptional();
 
-    public string NormalizeLastName() => LastName.Trim();
+    public string NormalizeLastName() => LastName.NormalizeRequired();
 
-    public string NormalizeEmail() => Email.Trim();
+    public string NormalizeEmail() => Email.NormalizeRequired();
 
-    public string NormalizeEmployeeId() => EmployeeId.Trim().ToUpperInvariant();
+    public string NormalizeEmployeeId() => EmployeeId.NormalizeRequired().ToUpperInvariant();
 }
 
 public sealed class UpdateUserRequest : IValidatableObject
@@ -91,15 +92,13 @@ public sealed class UpdateUserRequest : IValidatableObject
         }
     }
 
-    public string? NormalizeFirstName() => FirstName?.Trim();
+    public string? NormalizeFirstName() => FirstName?.NormalizeRequired();
 
-    public string? NormalizeMiddleName() => MiddleName is null
-        ? null
-        : (string.IsNullOrWhiteSpace(MiddleName) ? null : MiddleName.Trim());
+    public string? NormalizeMiddleName() => MiddleName.NormalizeOptional();
 
-    public string? NormalizeLastName() => LastName?.Trim();
+    public string? NormalizeLastName() => LastName?.NormalizeRequired();
 
-    public string? NormalizeEmail() => Email?.Trim();
+    public string? NormalizeEmail() => Email?.NormalizeRequired();
 
-    public string? NormalizeEmployeeId() => EmployeeId?.Trim().ToUpperInvariant();
+    public string? NormalizeEmployeeId() => EmployeeId?.NormalizeRequired()?.ToUpperInvariant();
 }

@@ -1,6 +1,15 @@
 COMPLETE COPY.txt
 AGDATA_Reward_Points_System.txt
 docs/codebase-overview.md
+../Piyush_Review_01.txt
+../Code_Review_Implementation_Summary.txt
+../Polish_Gaps_Implementation_Summary.txt
+../FINAL_IMPLEMENTATION_REPORT.txt
+../QUICK_REFERENCE_SUMMARY.txt  
+../SQL_Server_Database_Design.md
+../SUMMARY_HINDI_ENGLISH.txt 
+../.gitignore
+D:\Reward_point_system\Agdata.Rewards\.gitignore 
 
 # Build artifacts
 **/bin/
@@ -32,3 +41,4 @@ packages/
 # Logs and misc
 logs/
 *.log
+*.gitignore

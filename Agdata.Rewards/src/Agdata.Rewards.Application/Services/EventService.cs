@@ -21,8 +21,8 @@ public class EventService : IEventService
 
     public async Task<Event> CreateEventAsync(Admin creator, string name, DateTimeOffset occursAt, bool isActive = true)
     {
-    AdminGuard.EnsureActive(creator);
-        EnsureOccursAt(occursAt);
+        AdminGuard.EnsureActive(creator);
+        Guard.AgainstDefaultDateTime(occursAt, DomainErrors.Event.OccursAtRequired);
 
         var newEvent = Event.CreateNew(name, occursAt);
 
@@ -38,9 +38,9 @@ public class EventService : IEventService
 
     public async Task<Event> UpdateEventAsync(Admin editor, Guid eventId, string name, DateTimeOffset occursAt)
     {
-    AdminGuard.EnsureActive(editor);
-        EnsureEventId(eventId);
-        EnsureOccursAt(occursAt);
+        AdminGuard.EnsureActive(editor);
+        Guard.AgainstEmptyGuid(eventId, nameof(eventId), DomainErrors.Event.IdRequired);
+        Guard.AgainstDefaultDateTime(occursAt, DomainErrors.Event.OccursAtRequired);
 
         var eventToUpdate = await _eventRepository.GetEventByIdAsync(eventId)
             ?? throw new DomainException(DomainErrors.Event.NotFound);
@@ -55,8 +55,8 @@ public class EventService : IEventService
 
     public async Task DeactivateEventAsync(Admin editor, Guid eventId)
     {
-    AdminGuard.EnsureActive(editor);
-        EnsureEventId(eventId);
+        AdminGuard.EnsureActive(editor);
+        Guard.AgainstEmptyGuid(eventId, nameof(eventId), DomainErrors.Event.IdRequired);
 
         var eventToUpdate = await _eventRepository.GetEventByIdAsync(eventId)
             ?? throw new DomainException(DomainErrors.Event.NotFound);
@@ -69,20 +69,15 @@ public class EventService : IEventService
 
     public async Task<Event> SetEventActiveStateAsync(Admin editor, Guid eventId, bool isActive)
     {
-    AdminGuard.EnsureActive(editor);
-        EnsureEventId(eventId);
+        AdminGuard.EnsureActive(editor);
+        Guard.AgainstEmptyGuid(eventId, nameof(eventId), DomainErrors.Event.IdRequired);
 
         var eventToUpdate = await _eventRepository.GetEventByIdAsync(eventId)
             ?? throw new DomainException(DomainErrors.Event.NotFound);
 
-        if (isActive)
-        {
-            eventToUpdate.MakeActive();
-        }
-        else
-        {
-            eventToUpdate.MakeInactive();
-        }
+        // Use ternary-style approach via conditional invocation
+        if (isActive) eventToUpdate.MakeActive();
+        else eventToUpdate.MakeInactive();
 
         _eventRepository.UpdateEvent(eventToUpdate);
         await _unitOfWork.SaveChangesAsync();
@@ -92,7 +87,7 @@ public class EventService : IEventService
 
     public async Task<Event?> GetEventByIdAsync(Guid eventId)
     {
-        EnsureEventId(eventId);
+        Guard.AgainstEmptyGuid(eventId, nameof(eventId), DomainErrors.Event.IdRequired);
         return await _eventRepository.GetEventByIdAsync(eventId);
     }
 
@@ -104,6 +99,8 @@ public class EventService : IEventService
         return events
             .Where(e => e.IsActive && e.OccursAt >= now)
             .OrderBy(e => e.OccursAt)
+            .ThenBy(e => e.Name)  // Deterministic ordering when times match
+            .ThenBy(e => e.Id)
             .ToList();
     }
 
@@ -115,6 +112,8 @@ public class EventService : IEventService
         return events
             .Where(e => e.OccursAt < now)
             .OrderByDescending(e => e.OccursAt)
+            .ThenBy(e => e.Name)  // Deterministic ordering when times match
+            .ThenBy(e => e.Id)
             .ToList();
     }
 
@@ -123,22 +122,8 @@ public class EventService : IEventService
         var events = await _eventRepository.ListEventsAsync();
         return events
             .OrderBy(e => e.OccursAt)
+            .ThenBy(e => e.Name)  // Deterministic ordering when times match
+            .ThenBy(e => e.Id)
             .ToList();
-    }
-
-    private static void EnsureOccursAt(DateTimeOffset occursAt)
-    {
-        if (occursAt == default)
-        {
-            throw new DomainException(DomainErrors.Event.OccursAtRequired);
-        }
-    }
-
-    private static void EnsureEventId(Guid eventId)
-    {
-        if (eventId == Guid.Empty)
-        {
-            throw new DomainException(DomainErrors.Event.IdRequired);
-        }
     }
 }
