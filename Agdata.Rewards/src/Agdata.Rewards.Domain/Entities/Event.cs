@@ -9,6 +9,14 @@ public sealed class Event
     public DateTimeOffset OccursAt { get; private set; }
     public bool IsActive { get; private set; }
 
+    protected Event()
+    {
+        Id = Guid.Empty;
+        Name = string.Empty;
+        OccursAt = DateTimeOffset.UtcNow;
+        IsActive = true;
+    }
+
     public Event(Guid eventId, string name, DateTimeOffset occursAt, bool isActive = true)
     {
         if (eventId == Guid.Empty)

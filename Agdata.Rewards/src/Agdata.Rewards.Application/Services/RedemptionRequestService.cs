@@ -43,7 +43,7 @@ public class RedemptionRequestService : IRedemptionRequestService
         {
             try
             {
-                var user = await _userRepository.GetUserByIdAsync(userId)
+                var user = await _userRepository.GetUserByIdForUpdateAsync(userId)
                     ?? throw new DomainException(DomainErrors.User.NotFound);
 
                 if (!user.IsActive)
@@ -72,6 +72,11 @@ public class RedemptionRequestService : IRedemptionRequestService
                 await _unitOfWork.SaveChangesAsync();
                 return redemptionRequest.Id;
             }
+            catch (DomainException dex) when (attempt < maxRetries - 1 && dex.StatusCode == 409)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(50 * (attempt + 1)));
+                continue;
+            }
             catch (Exception ex) when (attempt < maxRetries - 1 && IsConcurrencyException(ex))
             {
                 await Task.Delay(TimeSpan.FromMilliseconds(50 * (attempt + 1)));
@@ -84,21 +89,39 @@ public class RedemptionRequestService : IRedemptionRequestService
 
     private static bool IsConcurrencyException(Exception ex)
     {
-        var typeName = ex.GetType().Name;
-        return typeName.Contains("Concurrency", StringComparison.OrdinalIgnoreCase) ||
-               typeName.Contains("DbUpdate", StringComparison.OrdinalIgnoreCase);
+        var exceptionType = ex.GetType();
+        var exceptionTypeName = exceptionType.Name;
+        
+        if (exceptionTypeName.Contains("Concurrency", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+        
+        if (exceptionTypeName.Contains("DbUpdate", StringComparison.OrdinalIgnoreCase))
+        {
+            var innerException = ex.InnerException;
+            if (innerException != null)
+            {
+                var innerTypeName = innerException.GetType().Name;
+                if (innerTypeName.Contains("SqlException", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+        }
+        
+        return false;
     }
 
     public async Task ApproveRedemptionAsync(Admin approver, Guid redemptionRequestId)
     {
         AdminGuard.EnsureActive(approver);
 
-        var redemptionRequest = await _redemptionRequestRepository.GetRedemptionRequestByIdAsync(redemptionRequestId)
+        var redemptionRequest = await _redemptionRequestRepository.GetRedemptionRequestByIdForUpdateAsync(redemptionRequestId)
             ?? throw new DomainException(DomainErrors.RedemptionRequest.NotFound);
 
         redemptionRequest.Approve();
 
-        _redemptionRequestRepository.UpdateRedemptionRequest(redemptionRequest);
         await _unitOfWork.SaveChangesAsync();
     }
 
@@ -106,13 +129,13 @@ public class RedemptionRequestService : IRedemptionRequestService
     {
         AdminGuard.EnsureActive(deliverer);
 
-        var redemptionRequest = await _redemptionRequestRepository.GetRedemptionRequestByIdAsync(redemptionRequestId)
+        var redemptionRequest = await _redemptionRequestRepository.GetRedemptionRequestByIdForUpdateAsync(redemptionRequestId)
             ?? throw new DomainException(DomainErrors.RedemptionRequest.NotFound);
 
-        var userAccount = await _userRepository.GetUserByIdAsync(redemptionRequest.UserId)
+        var userAccount = await _userRepository.GetUserByIdForUpdateAsync(redemptionRequest.UserId)
             ?? throw new DomainException(DomainErrors.Repository.NonExistentUserForRedemption);
 
-        var redeemedProduct = await _productRepository.GetProductByIdAsync(redemptionRequest.ProductId)
+        var redeemedProduct = await _productRepository.GetProductByIdForUpdateAsync(redemptionRequest.ProductId)
             ?? throw new DomainException(DomainErrors.Repository.NonExistentProductForRedemption);
 
         if (!redeemedProduct.IsAvailableInStock())
@@ -135,8 +158,6 @@ public class RedemptionRequestService : IRedemptionRequestService
 
         redeemedProduct.DecrementStock();
 
-        _productRepository.UpdateProduct(redeemedProduct);
-        _redemptionRequestRepository.UpdateRedemptionRequest(redemptionRequest);
         await _unitOfWork.SaveChangesAsync();
     }
 
@@ -144,10 +165,10 @@ public class RedemptionRequestService : IRedemptionRequestService
     {
         AdminGuard.EnsureActive(rejecter);
 
-        var redemptionRequest = await _redemptionRequestRepository.GetRedemptionRequestByIdAsync(redemptionRequestId)
+        var redemptionRequest = await _redemptionRequestRepository.GetRedemptionRequestByIdForUpdateAsync(redemptionRequestId)
             ?? throw new DomainException(DomainErrors.RedemptionRequest.NotFound);
 
-        var user = await _userRepository.GetUserByIdAsync(redemptionRequest.UserId)
+        var user = await _userRepository.GetUserByIdForUpdateAsync(redemptionRequest.UserId)
             ?? throw new DomainException(DomainErrors.User.NotFound);
 
         var product = await _productRepository.GetProductByIdAsync(redemptionRequest.ProductId)
@@ -155,7 +176,6 @@ public class RedemptionRequestService : IRedemptionRequestService
 
         redemptionRequest.Reject();
         await _pointsService.ReleasePointsAsync(user.Id, product.PointsCost);
-        _redemptionRequestRepository.UpdateRedemptionRequest(redemptionRequest);
 
         await _unitOfWork.SaveChangesAsync();
     }
@@ -164,10 +184,10 @@ public class RedemptionRequestService : IRedemptionRequestService
     {
         AdminGuard.EnsureActive(canceller);
 
-        var redemptionRequest = await _redemptionRequestRepository.GetRedemptionRequestByIdAsync(redemptionRequestId)
+        var redemptionRequest = await _redemptionRequestRepository.GetRedemptionRequestByIdForUpdateAsync(redemptionRequestId)
             ?? throw new DomainException(DomainErrors.RedemptionRequest.NotFound);
 
-        var user = await _userRepository.GetUserByIdAsync(redemptionRequest.UserId)
+        var user = await _userRepository.GetUserByIdForUpdateAsync(redemptionRequest.UserId)
             ?? throw new DomainException(DomainErrors.User.NotFound);
 
         var product = await _productRepository.GetProductByIdAsync(redemptionRequest.ProductId)
@@ -175,7 +195,6 @@ public class RedemptionRequestService : IRedemptionRequestService
 
         redemptionRequest.Cancel();
         await _pointsService.ReleasePointsAsync(user.Id, product.PointsCost);
-        _redemptionRequestRepository.UpdateRedemptionRequest(redemptionRequest);
 
         await _unitOfWork.SaveChangesAsync();
     }

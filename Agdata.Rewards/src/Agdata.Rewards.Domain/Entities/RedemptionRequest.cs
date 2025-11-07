@@ -4,11 +4,6 @@ using Agdata.Rewards.Domain.Exceptions;
 
 namespace Agdata.Rewards.Domain.Entities;
 
-/// <summary>
-/// Represents a user's request to redeem points for a product.
-/// This entity acts as a state machine, ensuring the redemption process
-/// follows valid lifecycle transitions (e.g., Pending -> Approved -> Delivered).
-/// </summary>
 public class RedemptionRequest
 {
     public Guid Id { get; }
@@ -19,6 +14,15 @@ public class RedemptionRequest
     public DateTimeOffset RequestedAt { get; }
     public DateTimeOffset? ApprovedAt { get; private set; }
     public DateTimeOffset? DeliveredAt { get; private set; }
+
+    protected RedemptionRequest()
+    {
+        Id = Guid.Empty;
+        UserId = Guid.Empty;
+        ProductId = Guid.Empty;
+        Status = RedemptionRequestStatus.Pending;
+        RequestedAt = DateTimeOffset.UtcNow;
+    }
 
     protected RedemptionRequest(Guid requestId, Guid userId, Guid productId)
     {

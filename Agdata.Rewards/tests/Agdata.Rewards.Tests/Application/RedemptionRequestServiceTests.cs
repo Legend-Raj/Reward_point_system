@@ -27,11 +27,32 @@ public class RedemptionRequestServiceTests
         {
             var results = Entries
                 .Where(tx => tx.UserId == userId)
-                .OrderBy(tx => tx.Timestamp)
+                .OrderByDescending(tx => tx.Timestamp)
+                .ThenBy(tx => tx.Id)
                 .ToList()
                 .AsReadOnly();
 
             return Task.FromResult<IReadOnlyList<LedgerEntry>>(results);
+        }
+
+        public Task<IReadOnlyList<LedgerEntry>> ListLedgerEntriesByUserAsync(Guid userId, int skip, int take, CancellationToken cancellationToken = default)
+        {
+            var results = Entries
+                .Where(tx => tx.UserId == userId)
+                .OrderByDescending(tx => tx.Timestamp)
+                .ThenBy(tx => tx.Id)
+                .Skip(skip)
+                .Take(take)
+                .ToList()
+                .AsReadOnly();
+
+            return Task.FromResult<IReadOnlyList<LedgerEntry>>(results);
+        }
+
+        public Task<int> CountLedgerEntriesByUserAsync(Guid userId, CancellationToken cancellationToken = default)
+        {
+            var count = Entries.Count(tx => tx.UserId == userId);
+            return Task.FromResult(count);
         }
     }
 

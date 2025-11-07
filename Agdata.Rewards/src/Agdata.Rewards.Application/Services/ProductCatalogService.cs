@@ -42,7 +42,7 @@ public class ProductCatalogService : IProductCatalogService
     {
         AdminGuard.EnsureActive(admin);
         
-        var product = await _productRepository.GetProductByIdAsync(productId)
+        var product = await _productRepository.GetProductByIdForUpdateAsync(productId)
             ?? throw new DomainException(DomainErrors.Product.NotFound);
 
         var mergedName = name ?? product.Name;
@@ -50,7 +50,7 @@ public class ProductCatalogService : IProductCatalogService
         var mergedPointsCost = pointsCost ?? product.PointsCost;
         var mergedImageUrl = imageUrl ?? product.ImageUrl;
 
-    product.ApplyDetails(mergedName, mergedDescription, mergedPointsCost, mergedImageUrl);
+        product.ApplyDetails(mergedName, mergedDescription, mergedPointsCost, mergedImageUrl);
 
         if (stock.HasValue)
         {
@@ -63,7 +63,6 @@ public class ProductCatalogService : IProductCatalogService
             else product.MakeInactive();
         }
 
-        _productRepository.UpdateProduct(product);
         await _unitOfWork.SaveChangesAsync();
 
         return product;
@@ -73,12 +72,11 @@ public class ProductCatalogService : IProductCatalogService
     {
         AdminGuard.EnsureActive(admin);
         
-        var product = await _productRepository.GetProductByIdAsync(productId)
+        var product = await _productRepository.GetProductByIdForUpdateAsync(productId)
             ?? throw new DomainException(DomainErrors.Product.NotFound);
 
         product.UpdateStockQuantity(stock);
 
-        _productRepository.UpdateProduct(product);
         await _unitOfWork.SaveChangesAsync();
 
         return product;
@@ -88,12 +86,11 @@ public class ProductCatalogService : IProductCatalogService
     {
         AdminGuard.EnsureActive(admin);
         
-        var product = await _productRepository.GetProductByIdAsync(productId)
+        var product = await _productRepository.GetProductByIdForUpdateAsync(productId)
             ?? throw new DomainException(DomainErrors.Product.NotFound);
 
         product.IncrementStock(quantity);
 
-        _productRepository.UpdateProduct(product);
         await _unitOfWork.SaveChangesAsync();
 
         return product;
@@ -103,12 +100,11 @@ public class ProductCatalogService : IProductCatalogService
     {
         AdminGuard.EnsureActive(admin);
         
-        var product = await _productRepository.GetProductByIdAsync(productId)
+        var product = await _productRepository.GetProductByIdForUpdateAsync(productId)
             ?? throw new DomainException(DomainErrors.Product.NotFound);
 
         product.DecrementStock(quantity);
 
-        _productRepository.UpdateProduct(product);
         await _unitOfWork.SaveChangesAsync();
 
         return product;

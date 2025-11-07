@@ -24,6 +24,15 @@ public class UserRepositoryInMemory : IUserRepository
         }
     }
 
+    public Task<User?> GetUserByIdForUpdateAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        lock (_gate)
+        {
+            _users.TryGetValue(userId, out var user);
+            return Task.FromResult(user);
+        }
+    }
+
     public Task<User?> GetUserByEmailAsync(Email email, CancellationToken cancellationToken = default)
     {
         lock (_gate)
@@ -64,6 +73,19 @@ public class UserRepositoryInMemory : IUserRepository
         {
             IReadOnlyList<User> users = _users.Values.ToList();
             return Task.FromResult(users);
+        }
+    }
+
+    public Task<IReadOnlyList<User>> GetTop3EmployeesWithHighestRewardsAsync(CancellationToken cancellationToken = default)
+    {
+        lock (_gate)
+        {
+            var topUsers = _users.Values
+                .Where(u => u is not Admin && u.IsActive)
+                .OrderByDescending(u => u.TotalPoints)
+                .Take(3)
+                .ToList();
+            return Task.FromResult<IReadOnlyList<User>>(topUsers);
         }
     }
 }

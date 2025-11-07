@@ -5,6 +5,12 @@ namespace Agdata.Rewards.Domain.Entities;
 
 public sealed class Admin : User
 {
+    // Protected parameterless constructor for EF Core
+    protected Admin() : base()
+    {
+        // EF Core only - do not use directly
+    }
+
     public Admin(
         Guid adminId,
         PersonName name,
@@ -17,7 +23,7 @@ public sealed class Admin : User
         DateTimeOffset? updatedAt = null)
     : base(adminId, name, email, employeeId, isActive, totalPoints, lockedPoints, createdAt, updatedAt)
     {
-        // Admin inherits all base properties and behavior from User
+        
     }
 
     public new static Admin CreateNew(string firstName, string? middleName, string lastName, string email, string employeeId)

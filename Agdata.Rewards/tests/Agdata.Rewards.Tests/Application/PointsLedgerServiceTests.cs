@@ -27,11 +27,32 @@ public class PointsLedgerServiceTests
         {
             var slice = Entries
                 .Where(tx => tx.UserId == userId)
-                .OrderBy(tx => tx.Timestamp)
+                .OrderByDescending(tx => tx.Timestamp)
+                .ThenBy(tx => tx.Id)
                 .ToList()
                 .AsReadOnly();
 
             return Task.FromResult<IReadOnlyList<LedgerEntry>>(slice);
+        }
+
+        public Task<IReadOnlyList<LedgerEntry>> ListLedgerEntriesByUserAsync(Guid userId, int skip, int take, CancellationToken cancellationToken = default)
+        {
+            var slice = Entries
+                .Where(tx => tx.UserId == userId)
+                .OrderByDescending(tx => tx.Timestamp)
+                .ThenBy(tx => tx.Id)
+                .Skip(skip)
+                .Take(take)
+                .ToList()
+                .AsReadOnly();
+
+            return Task.FromResult<IReadOnlyList<LedgerEntry>>(slice);
+        }
+
+        public Task<int> CountLedgerEntriesByUserAsync(Guid userId, CancellationToken cancellationToken = default)
+        {
+            var count = Entries.Count(tx => tx.UserId == userId);
+            return Task.FromResult(count);
         }
     }
 

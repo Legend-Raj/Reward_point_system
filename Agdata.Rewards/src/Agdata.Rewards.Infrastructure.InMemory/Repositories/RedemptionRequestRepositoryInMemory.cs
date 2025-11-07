@@ -23,6 +23,15 @@ public class RedemptionRequestRepositoryInMemory : IRedemptionRequestRepository
         }
     }
 
+    public Task<RedemptionRequest?> GetRedemptionRequestByIdForUpdateAsync(Guid redemptionRequestId, CancellationToken cancellationToken = default)
+    {
+        lock (_gate)
+        {
+            _redemptions.TryGetValue(redemptionRequestId, out var redemption);
+            return Task.FromResult(redemption);
+        }
+    }
+
     public Task<bool> HasPendingRedemptionRequestForProductAsync(Guid userId, Guid productId, CancellationToken cancellationToken = default)
     {
         lock (_gate)
