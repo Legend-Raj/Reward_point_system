@@ -48,7 +48,7 @@ public class PointsLedgerService : IPointsLedgerService
         {
             try
             {
-                var userAccount = await _userRepository.GetUserByIdAsync(userId)
+                var userAccount = await _userRepository.GetUserByIdForUpdateAsync(userId)
                     ?? throw new DomainException(DomainErrors.Repository.NonExistentUser);
 
                 if (!userAccount.IsActive)
@@ -79,6 +79,11 @@ public class PointsLedgerService : IPointsLedgerService
                 await _unitOfWork.SaveChangesAsync();
                 return ledgerEntry;
             }
+            catch (DomainException dex) when (attempt < maxRetries - 1 && dex.StatusCode == 409)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(50 * (attempt + 1)));
+                continue;
+            }
             catch (Exception ex) when (attempt < maxRetries - 1 && IsConcurrencyException(ex))
             {
                 await Task.Delay(TimeSpan.FromMilliseconds(50 * (attempt + 1)));
@@ -91,28 +96,42 @@ public class PointsLedgerService : IPointsLedgerService
 
     private static bool IsConcurrencyException(Exception ex)
     {
-        var typeName = ex.GetType().Name;
-        return typeName.Contains("Concurrency", StringComparison.OrdinalIgnoreCase) ||
-               typeName.Contains("DbUpdate", StringComparison.OrdinalIgnoreCase);
+        var exceptionType = ex.GetType();
+        var exceptionTypeName = exceptionType.Name;
+        
+        if (exceptionTypeName.Contains("Concurrency", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+        
+        if (exceptionTypeName.Contains("DbUpdate", StringComparison.OrdinalIgnoreCase))
+        {
+            var innerException = ex.InnerException;
+            if (innerException != null)
+            {
+                var innerTypeName = innerException.GetType().Name;
+                if (innerTypeName.Contains("SqlException", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+        }
+        
+        return false;
     }
 
     public async Task<PagedResult<LedgerEntry>> GetUserTransactionHistoryAsync(Guid userId, int skip, int take)
     {
-       
         Guard.AgainstNegativeSkip(skip);
         Guard.AgainstInvalidTake(take, MaxPageSize);
 
         var user = await _userRepository.GetUserByIdAsync(userId)
             ?? throw new DomainException(DomainErrors.History.UserMissing);
 
-        var history = await _ledgerEntryRepository.ListLedgerEntriesByUserAsync(user.Id);
-        var ordered = history
-            .OrderByDescending(tx => tx.Timestamp)
-            .ThenBy(tx => tx.Id) 
-            .ToList();
-        var page = ordered.Skip(skip).Take(take).ToList();
+        var history = await _ledgerEntryRepository.ListLedgerEntriesByUserAsync(user.Id, skip, take);
+        var totalCount = await _ledgerEntryRepository.CountLedgerEntriesByUserAsync(user.Id);
 
-        return new PagedResult<LedgerEntry>(page, ordered.Count, skip, take);
+        return new PagedResult<LedgerEntry>(history, totalCount, skip, take);
     }
 
 }

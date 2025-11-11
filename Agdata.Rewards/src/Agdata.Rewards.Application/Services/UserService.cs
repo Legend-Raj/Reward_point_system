@@ -75,7 +75,7 @@ public class UserService : IUserService
 
     public async Task<User> UpdateUserAsync(Guid userId, string? firstName, string? middleName, string? lastName, string? email, string? employeeId, bool? isActive)
     {
-        var user = await _userRepository.GetUserByIdAsync(userId)
+        var user = await _userRepository.GetUserByIdForUpdateAsync(userId)
             ?? throw new DomainException(DomainErrors.User.NotFound);
 
         if (firstName is not null || middleName is not null || lastName is not null)
@@ -123,7 +123,6 @@ public class UserService : IUserService
             }
         }
 
-        _userRepository.UpdateUser(user);
         await _unitOfWork.SaveChangesAsync();
 
         return user;
@@ -131,13 +130,12 @@ public class UserService : IUserService
 
     public async Task<User> ActivateUserAsync(Guid userId)
     {
-        var user = await _userRepository.GetUserByIdAsync(userId)
+        var user = await _userRepository.GetUserByIdForUpdateAsync(userId)
             ?? throw new DomainException(DomainErrors.User.NotFound);
 
         if (!user.IsActive)
         {
             user.Activate();
-            _userRepository.UpdateUser(user);
             await _unitOfWork.SaveChangesAsync();
         }
 
@@ -146,13 +144,12 @@ public class UserService : IUserService
 
     public async Task<User> DeactivateUserAsync(Guid userId)
     {
-        var user = await _userRepository.GetUserByIdAsync(userId)
+        var user = await _userRepository.GetUserByIdForUpdateAsync(userId)
             ?? throw new DomainException(DomainErrors.User.NotFound);
 
         if (user.IsActive)
         {
             user.Deactivate();
-            _userRepository.UpdateUser(user);
             await _unitOfWork.SaveChangesAsync();
         }
 

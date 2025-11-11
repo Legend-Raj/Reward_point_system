@@ -16,10 +16,18 @@ public sealed class Product
     public DateTimeOffset CreatedAt { get; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
-    /// <summary>
-    /// Concurrency token for optimistic locking (EF Core [Timestamp] attribute).
-    /// </summary>
     public byte[] RowVersion { get; private set; }
+
+    protected Product()
+    {
+        Id = Guid.Empty;
+        Name = string.Empty;
+        PointsCost = 0;
+        IsActive = true;
+        CreatedAt = DateTimeOffset.UtcNow;
+        UpdatedAt = DateTimeOffset.UtcNow;
+        RowVersion = Array.Empty<byte>();
+    }
 
     public Product(
         Guid productId,
@@ -136,7 +144,10 @@ public sealed class Product
             throw new DomainException(DomainErrors.Product.InsufficientStock);
         }
 
-        Stock -= quantity;
+        checked
+        {
+            Stock -= quantity;
+        }
         Touch();
     }
 

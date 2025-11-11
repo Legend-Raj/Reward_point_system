@@ -27,11 +27,38 @@ public class LedgerEntryRepositoryInMemory : ILedgerEntryRepository
         {
             var slice = _entries
                 .Where(entry => entry.UserId == userId)
-                .OrderBy(entry => entry.Timestamp)
+                .OrderByDescending(entry => entry.Timestamp)
+                .ThenBy(entry => entry.Id)
                 .ToList()
                 .AsReadOnly();
 
             return Task.FromResult<IReadOnlyList<LedgerEntry>>(slice);
+        }
+    }
+
+    public Task<IReadOnlyList<LedgerEntry>> ListLedgerEntriesByUserAsync(Guid userId, int skip, int take, CancellationToken cancellationToken = default)
+    {
+        lock (_gate)
+        {
+            var slice = _entries
+                .Where(entry => entry.UserId == userId)
+                .OrderByDescending(entry => entry.Timestamp)
+                .ThenBy(entry => entry.Id)
+                .Skip(skip)
+                .Take(take)
+                .ToList()
+                .AsReadOnly();
+
+            return Task.FromResult<IReadOnlyList<LedgerEntry>>(slice);
+        }
+    }
+
+    public Task<int> CountLedgerEntriesByUserAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        lock (_gate)
+        {
+            var count = _entries.Count(entry => entry.UserId == userId);
+            return Task.FromResult(count);
         }
     }
 }

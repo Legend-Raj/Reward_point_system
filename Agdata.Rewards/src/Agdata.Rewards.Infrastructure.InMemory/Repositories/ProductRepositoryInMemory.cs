@@ -22,6 +22,15 @@ public class ProductRepositoryInMemory : IProductRepository
         }
     }
 
+    public Task<Product?> GetProductByIdForUpdateAsync(Guid productId, CancellationToken cancellationToken = default)
+    {
+        lock (_gate)
+        {
+            _products.TryGetValue(productId, out var product);
+            return Task.FromResult(product);
+        }
+    }
+
     public Task<IEnumerable<Product>> ListProductsAsync(CancellationToken cancellationToken = default)
     {
         lock (_gate)

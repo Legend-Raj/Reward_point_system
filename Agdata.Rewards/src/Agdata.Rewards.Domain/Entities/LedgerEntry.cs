@@ -14,6 +14,15 @@ public sealed class LedgerEntry
     public int Points { get; }
     public DateTimeOffset Timestamp { get; }
 
+    protected LedgerEntry()
+    {
+        Id = Guid.Empty;
+        UserId = Guid.Empty;
+        Type = LedgerEntryType.Earn;
+        Points = 0;
+        Timestamp = DateTimeOffset.UtcNow;
+    }
+
     public LedgerEntry(
         Guid ledgerEntryId,
         Guid userId,

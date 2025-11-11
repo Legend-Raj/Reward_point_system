@@ -19,140 +19,50 @@ public class PointsService : IPointsService
 
     public async Task<User> CreditPointsAsync(Guid userId, int points)
     {
-        if (points <= 0)
-        {
-            throw new DomainException(DomainErrors.User.CreditAmountMustBePositive);
-        }
-
-        var user = await _userRepository.GetUserByIdAsync(userId);
+        var user = await _userRepository.GetUserByIdForUpdateAsync(userId);
         if (user == null)
         {
             throw new DomainException(DomainErrors.User.NotFound);
         }
 
-        if (!user.IsActive)
-        {
-            throw new DomainException(DomainErrors.User.AllocationBlockedInactiveAccount);
-        }
-
-        var updatedUser = new User(
-            user.Id,
-            user.Name,
-            user.Email,
-            user.EmployeeId,
-            user.IsActive,
-            user.TotalPoints + points,
-            user.LockedPoints,
-            user.CreatedAt,
-            DateTimeOffset.UtcNow
-        );
-
-        _userRepository.UpdateUser(updatedUser);
-        // Note: Caller is responsible for calling SaveChangesAsync to control transaction boundary
-
-        return updatedUser;
+        user.CreditPoints(points);
+        return user;
     }
 
     public async Task<User> ReservePointsAsync(Guid userId, int points)
     {
-        if (points <= 0)
-        {
-            throw new DomainException(DomainErrors.User.ReserveAmountMustBePositive);
-        }
-
-        var user = await _userRepository.GetUserByIdAsync(userId);
+        var user = await _userRepository.GetUserByIdForUpdateAsync(userId);
         if (user == null)
         {
             throw new DomainException(DomainErrors.User.NotFound);
         }
 
-        if (user.AvailablePoints < points)
-        {
-            throw new DomainException(DomainErrors.User.InsufficientPointsToReserve);
-        }
-
-        var updatedUser = new User(
-            user.Id,
-            user.Name,
-            user.Email,
-            user.EmployeeId,
-            user.IsActive,
-            user.TotalPoints,
-            user.LockedPoints + points,
-            user.CreatedAt,
-            DateTimeOffset.UtcNow
-        );
-
-        _userRepository.UpdateUser(updatedUser);
-        return updatedUser;
+        user.ReservePoints(points);
+        return user;
     }
 
     public async Task<User> ReleasePointsAsync(Guid userId, int points)
     {
-        if (points <= 0)
-        {
-            throw new DomainException(DomainErrors.User.ReleaseAmountMustBePositive);
-        }
-
-        var user = await _userRepository.GetUserByIdAsync(userId);
+        var user = await _userRepository.GetUserByIdForUpdateAsync(userId);
         if (user == null)
         {
             throw new DomainException(DomainErrors.User.NotFound);
         }
 
-        if (user.LockedPoints < points)
-        {
-            throw new DomainException(DomainErrors.User.ReleaseExceedsReserved);
-        }
-
-        var updatedUser = new User(
-            user.Id,
-            user.Name,
-            user.Email,
-            user.EmployeeId,
-            user.IsActive,
-            user.TotalPoints,
-            user.LockedPoints - points,
-            user.CreatedAt,
-            DateTimeOffset.UtcNow
-        );
-
-        _userRepository.UpdateUser(updatedUser);
-        return updatedUser;
+        user.ReleasePoints(points);
+        return user;
     }
 
     public async Task<User> CapturePointsAsync(Guid userId, int points)
     {
-        if (points <= 0)
-        {
-            throw new DomainException(DomainErrors.User.CaptureAmountMustBePositive);
-        }
-
-        var user = await _userRepository.GetUserByIdAsync(userId);
+        var user = await _userRepository.GetUserByIdForUpdateAsync(userId);
         if (user == null)
         {
             throw new DomainException(DomainErrors.User.NotFound);
         }
 
-        if (user.LockedPoints < points)
-        {
-            throw new DomainException(DomainErrors.User.CaptureExceedsReserved);
-        }
-
-        var updatedUser = new User(
-            user.Id,
-            user.Name,
-            user.Email,
-            user.EmployeeId,
-            user.IsActive,
-            user.TotalPoints - points,
-            user.LockedPoints - points,
-            user.CreatedAt,
-            DateTimeOffset.UtcNow
-        );
-
-        _userRepository.UpdateUser(updatedUser);
-        return updatedUser;
+        user.CapturePoints(points);
+        return user;
     }
 
     public async Task<(int TotalPoints, int LockedPoints, int AvailablePoints)> GetPointsBalanceAsync(Guid userId)

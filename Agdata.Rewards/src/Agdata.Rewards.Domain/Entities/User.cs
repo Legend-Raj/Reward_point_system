@@ -22,6 +22,20 @@ public class User
 
     public byte[] RowVersion { get; private set; }
 
+    protected User()
+    {
+        Id = Guid.Empty;
+        Name = PersonName.Create("EF", "Core", "User");
+        Email = new Email("efcore@temp.local");
+        EmployeeId = new EmployeeId("EFC-000");
+        IsActive = true;
+        TotalPoints = 0;
+        LockedPoints = 0;
+        CreatedAt = DateTimeOffset.UtcNow;
+        UpdatedAt = DateTimeOffset.UtcNow;
+        RowVersion = Array.Empty<byte>();
+    }
+
     public User(
         Guid userId,
         PersonName name,
@@ -123,6 +137,69 @@ public class User
     public void Rename(PersonName newName)
     {
         Name = newName ?? throw new DomainException(DomainErrors.User.NameRequired);
+        Touch();
+    }
+
+    public void CreditPoints(int points)
+    {
+        if (points <= 0)
+        {
+            throw new DomainException(DomainErrors.User.CreditAmountMustBePositive);
+        }
+        if (!IsActive)
+        {
+            throw new DomainException(DomainErrors.User.AllocationBlockedInactiveAccount);
+        }
+        checked
+        {
+            TotalPoints += points;
+        }
+        Touch();
+    }
+
+    public void ReservePoints(int points)
+    {
+        if (points <= 0)
+        {
+            throw new DomainException(DomainErrors.User.ReserveAmountMustBePositive);
+        }
+        if (AvailablePoints < points)
+        {
+            throw new DomainException(DomainErrors.User.InsufficientPointsToReserve);
+        }
+        checked
+        {
+            LockedPoints += points;
+        }
+        Touch();
+    }
+
+    public void ReleasePoints(int points)
+    {
+        if (points <= 0)
+        {
+            throw new DomainException(DomainErrors.User.ReleaseAmountMustBePositive);
+        }
+        if (LockedPoints < points)
+        {
+            throw new DomainException(DomainErrors.User.ReleaseExceedsReserved);
+        }
+        LockedPoints -= points;
+        Touch();
+    }
+
+    public void CapturePoints(int points)
+    {
+        if (points <= 0)
+        {
+            throw new DomainException(DomainErrors.User.CaptureAmountMustBePositive);
+        }
+        if (LockedPoints < points)
+        {
+            throw new DomainException(DomainErrors.User.CaptureExceedsReserved);
+        }
+        TotalPoints -= points;
+        LockedPoints -= points;
         Touch();
     }
 

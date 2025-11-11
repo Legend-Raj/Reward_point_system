@@ -41,4 +41,9 @@ packages/
 # Logs and misc
 logs/
 *.log
-*.gitignore
+
+# App settings with local configurations
+**/appsettings.json
+**/appsettings.Development.json
+**/appsettings.*.json
+!**/appsettings.example.json

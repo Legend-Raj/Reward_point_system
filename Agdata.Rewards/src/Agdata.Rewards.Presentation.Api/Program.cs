@@ -9,7 +9,7 @@ using Agdata.Rewards.Domain.Entities;
 using Agdata.Rewards.Domain.Exceptions;
 using Agdata.Rewards.Domain.ValueObjects;
 using Agdata.Rewards.Domain.Extensions;
-using Agdata.Rewards.Infrastructure.InMemory;
+using Agdata.Rewards.Infrastructure.SqlServer;
 using Agdata.Rewards.Presentation.Api.Models.Requests;
 using Agdata.Rewards.Presentation.Api.Models.Responses;
 using Agdata.Rewards.Presentation.Api.Validation;
@@ -21,10 +21,16 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-builder.Services.AddRewardsInMemory(options =>
+// Use SQL Server for data persistence
+builder.Services.AddRewardsSqlServer(builder.Configuration, options =>
 {
 	options.AddByEmail("devops@agdata.com");
 });
+
+// For development/testing: Keep InMemory available via conditional compilation or environment variable
+// #if DEBUG
+// builder.Services.AddRewardsInMemory(options => { options.AddByEmail("devops@agdata.com"); });
+// #endif
 
 var app = builder.Build();
 
@@ -55,9 +61,7 @@ app.MapGet("/", () => Results.Ok("Rewards API is running"))
    .WithName("GetStatus")
    .Produces<string>(StatusCodes.Status200OK, MediaTypeNames.Application.Json);
 
-// ============================================================================
-// USER ENDPOINTS (Public - self-service user management)
-// ============================================================================
+
 var users = app.MapGroup("/users").WithTags("Users");
 
 users.MapPost(string.Empty, async ([FromBody] CreateUserRequest request, IUserService service) =>
@@ -89,7 +93,7 @@ users.MapPatch("/{userId:guid}", async (
 		return Results.ValidationProblem(errors);
 	}
 
-	var user = await userRepository.GetUserByIdAsync(userId) ?? throw new DomainException(DomainErrors.User.NotFound);
+	var user = await userRepository.GetUserByIdForUpdateAsync(userId) ?? throw new DomainException(DomainErrors.User.NotFound);
 
 	var wantsNameUpdate = request.HasNameChange;
 	if (wantsNameUpdate)
@@ -97,7 +101,7 @@ users.MapPatch("/{userId:guid}", async (
 		var first = request.NormalizeFirstName() ?? user.Name.FirstName;
 		var middle = request.MiddleName is null ? user.Name.MiddleName : request.NormalizeMiddleName();
 		var last = request.NormalizeLastName() ?? user.Name.LastName;
-	user.Rename(PersonName.Create(first, middle, last));
+		user.Rename(PersonName.Create(first, middle, last));
 	}
 
 	if (request.Email is not null)
@@ -142,7 +146,6 @@ users.MapPatch("/{userId:guid}", async (
 		}
 	}
 
-	userRepository.UpdateUser(user);
 	await unitOfWork.SaveChangesAsync();
 
 	return Results.Ok(UserResponse.From(user));
@@ -153,6 +156,13 @@ users.MapGet("/{userId:guid}", async (Guid userId, IUserService service) =>
 	var user = await service.GetUserByIdAsync(userId);
 	return user is null ? Results.NotFound() : Results.Ok(UserResponse.From(user));
 }).WithName("GetUser");
+
+users.MapGet("/top-3", async (IUserRepository userRepository) =>
+{
+	var topEmployees = await userRepository.GetTop3EmployeesWithHighestRewardsAsync();
+	var response = topEmployees.Select(UserResponse.From).ToList();
+	return Results.Ok(response);
+}).WithName("GetTop3Employees");
 
 // ============================================================================
 // ADMIN - EVENT MANAGEMENT ENDPOINTS (Admin-only)
